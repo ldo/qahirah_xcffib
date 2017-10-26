@@ -28,7 +28,7 @@ def def_xcffib_subclass(base_class, xcffib_module, xcffib_name) :
 
         def ensure_struct(celf, s) :
             if (
-                    not isinstance(s, celf)
+                    not isinstance(s, base_class)
                 and
                     xcffib != None
                 and
