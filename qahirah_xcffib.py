@@ -30,8 +30,6 @@ def def_xcffib_subclass(base_class, xcffib_module, xcffib_name) :
             if (
                     not isinstance(s, base_class)
                 and
-                    xcffib != None
-                and
                     isinstance(s, getattr(xcffib_module, xcffib_name))
             ) :
                 s = celf \
