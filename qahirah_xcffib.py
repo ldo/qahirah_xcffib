@@ -18,7 +18,7 @@ assert qahirah.HAS.XCB_SURFACE, "Cairo is missing XCB support"
 _ffi = cffi.FFI()
 _ffi_size_t = _ffi.typeof("size_t")
 
-def def_xcffib_subclass(base_class, xcffib_module, xcffib_name) :
+def def_xcffib_subclass(base_class, xcffib_module, xcffib_name, substructs = None) :
     # defines a subclass of base_class that adds an ensure_struct
     # method for converting from the xcffib wrapper objects.
 
@@ -27,20 +27,19 @@ def def_xcffib_subclass(base_class, xcffib_module, xcffib_name) :
     class result_class(base_class) :
 
         def ensure_struct(celf, s) :
-            if (
-                    not isinstance(s, base_class)
-                and
-                    isinstance(s, getattr(xcffib_module, xcffib_name))
-            ) :
-                s = celf \
+            if not isinstance(s, base_class) :
+                fields = dict \
                   (
-                    **dict
-                      (
-                        (name, getattr(s, name))
-                        for name, cttype in celf._ctstruct._fields_
-                        if celf._ignore == None or name not in celf._ignore
-                      )
+                    (name, getattr(s, name))
+                    for name, cttype in celf._ctstruct._fields_
+                    if celf._ignore == None or name not in celf._ignore
                   )
+                if substructs != None :
+                    for field_name, field_type in substructs.items() :
+                        fields[field_name] = field_type.ensure_struct(fields[field_name])
+                    #end for
+                #end if
+                s = celf(**fields)
             #end if
             return \
                 s
@@ -77,6 +76,12 @@ XCBVisualType = def_xcffib_subclass \
     xcffib_module = xproto,
     xcffib_name = "VISUALTYPE"
   )
+XCBRenderDirectFormat = def_xcffib_subclass \
+  (
+    base_class = qahirah.XCBRenderDirectFormat,
+    xcffib_module = xproto,
+    xcffib_name = "DIRECTFORMAT"
+  )
 XCBScreen = def_xcffib_subclass \
   (
     base_class = qahirah.XCBScreen,
@@ -87,7 +92,8 @@ XCBRenderPictFormInfo = def_xcffib_subclass \
   (
     base_class = qahirah.XCBRenderPictFormInfo,
     xcffib_module = xrender,
-    xcffib_name = "PICTFORMINFO"
+    xcffib_name = "PICTFORMINFO",
+    substructs = {"direct" : XCBRenderDirectFormat}
   )
 
 del def_xcffib_subclass # my work is done
