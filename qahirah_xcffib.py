@@ -2,10 +2,13 @@
 with the xcffib binding.
 """
 #+
-# Copyright 2017 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+# Copyright 2017, 2021 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
 # Licensed under the GNU Lesser General Public License v2.1 or later.
 #-
 
+from weakref import \
+    ref as weak_ref
+import asyncio
 import qahirah
 import cffi
 import xcffib
@@ -17,6 +20,20 @@ assert qahirah.HAS.XCB_SURFACE, "Cairo is missing XCB support"
 
 _ffi = cffi.FFI()
 _ffi_size_t = _ffi.typeof("size_t")
+
+def _get_conn(connection) :
+    "gets the raw xcb_connection_t address from the xcffib.Connection object." \
+    " Will this continue to work reliably in future? Who knows..."
+    if not hasattr(connection, "_conn") :
+        raise TypeError("connection does not have a _conn attribute")
+    #end if
+    return \
+        int(_ffi.cast(_ffi_size_t, connection._conn))
+#end _get_conn
+
+#+
+# Needed Cairo interface types
+#-
 
 def def_xcffib_subclass(base_class, xcffib_module, xcffib_name, substructs = None) :
     # defines a subclass of base_class that adds an ensure_struct
@@ -104,20 +121,9 @@ class XCBSurface(qahirah.XCBSurface) :
 
     __slots__ = () # to forestall typos
 
-    @staticmethod
-    def _get_conn(connection) :
-        "gets the raw xcb_connection_t address from the xcffib.Connection object." \
-        " Will this continue to work reliably in future? Who knows..."
-        if not hasattr(connection, "_conn") :
-            raise TypeError("connection does not have a _conn attribute")
-        #end if
-        return \
-            int(_ffi.cast(_ffi_size_t, connection._conn))
-    #end _get_conn
-
     @classmethod
     def create(celf, connection, drawable, visual, width, height) :
-        conn = celf._get_conn(connection)
+        conn = _get_conn(connection)
         visual = XCBVisualType.ensure_struct(visual)
         return \
             super().create \
@@ -132,7 +138,7 @@ class XCBSurface(qahirah.XCBSurface) :
 
     @classmethod
     def create_for_bitmap(celf, connection, screen, bitmap, width, height) :
-        conn = celf._get_conn(connection)
+        conn = _get_conn(connection)
         screen = XCBScreen.ensure_struct(screen)
         return \
             super().create_for_bitmap \
@@ -147,7 +153,7 @@ class XCBSurface(qahirah.XCBSurface) :
 
     @classmethod
     def create_with_xrender_format(celf, connection, screen, drawable, format, width, height) :
-        conn = celf._get_conn(connection)
+        conn = _get_conn(connection)
         screen = XCBScreen.ensure_struct(screen)
         format = XCBRenderPictFormInfo.ensure_struct(format)
         return \
@@ -162,4 +168,53 @@ class XCBSurface(qahirah.XCBSurface) :
               )
     #end create_with_xrender_format
 
+    def flush(self) :
+        super().flush() # docs say to do this ...
+        xcffib.lib.xcb_flush(xcffib.ffi.cast("xcb_connection_t *", self.device.xcb_connection))
+          # ... though this is what really seems to be essential
+    #end flush
+
 #end XCBSurface
+
+#+
+# Event loop
+#-
+
+class ConnWrapper :
+
+    __slots__ = ("__weakref__", "conn", "loop") # to forestall typos
+
+    def __init__(self, conn, loop = None) :
+        _get_conn(conn) # just a sanity check
+        if loop == None :
+            loop = asyncio.get_event_loop()
+        #end if
+        self.conn = conn
+        self.loop = loop
+    #end __init__
+
+    async def wait_for_event(self) :
+
+        result = self.loop.create_future()
+        w_self = weak_ref(self)
+
+        def handle_conn_readable() :
+            self = w_self()
+            assert self != None, "parent ConnWrapper has gone away"
+            event = self.conn.poll_for_event()
+            if event != None :
+                self.loop.remove_reader(self.conn.get_file_descriptor())
+                result.set_result(event)
+            elif conn.has_error() :
+                raise RuntimeError("error on XCB connection")
+            else :
+                print("XCB conn readable but no event") # debug
+            #end if
+        #end handle_conn_readable
+
+    #begin wait_for_event
+        self.loop.add_reader(self.conn.get_file_descriptor(), handle_conn_readable)
+        return await result
+    #end wait_for_event
+
+#end ConnWrapper
