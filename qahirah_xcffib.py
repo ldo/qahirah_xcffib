@@ -6,6 +6,10 @@ with the xcffib binding.
 # Licensed under the GNU Lesser General Public License v2.1 or later.
 #-
 
+# Useful XCB docs:
+# <https://xcb.freedesktop.org/manual/modules.html>
+# <https://xcb.freedesktop.org/PublicApi/>
+
 from weakref import \
     ref as weak_ref
 import asyncio
@@ -216,5 +220,97 @@ class ConnWrapper :
         self.loop.add_reader(self.conn.get_file_descriptor(), handle_conn_readable)
         return await result
     #end wait_for_event
+
+    def easy_create_window(self, bounds : qahirah.Rect, border_width : int) :
+        default_screen = self.conn.get_screen_pointers()[0]
+        use_root = self.conn.get_setup().roots[0]
+        window = self.conn.generate_id()
+        res = self.conn.core.CreateWindow \
+          (
+            depth = xcffib.XCB_COPY_FROM_PARENT,
+            wid = window,
+            parent = default_screen.root,
+            x = bounds.left,
+            y = bounds.top,
+            width = bounds.width,
+            height = bounds.height,
+            border_width = border_width,
+            _class = xcffib.XCB_COPY_FROM_PARENT,
+            visual = use_root.root_visual, # xcffib.XCB_COPY_FROM_PARENT,
+            value_mask = xproto.CW.BackPixel | xproto.CW.BorderPixel | xproto.CW.EventMask,
+            value_list =
+                [ # note ordering defined in xproto.py
+                    use_root.white_pixel, # BackPixel
+                    use_root.black_pixel, # BorderPixel
+                        xproto.EventMask.KeyPress # EventMask
+                    |
+                        xproto.EventMask.ButtonPress
+                    |
+                        xproto.EventMask.ButtonRelease
+                    |
+                        xproto.EventMask.Exposure
+                    |
+                        xproto.EventMask.StructureNotify,
+                ]
+          )
+        # seems requests are not actually processed unless I call request_check...
+        self.conn.request_check(res.sequence)
+        return \
+            window
+    #end easy_create_window
+
+    def easy_create_surface(self, window, use_xrender) :
+        default_screen = self.conn.get_screen_pointers()[0]
+        use_root = self.conn.get_setup().roots[0]
+        if use_xrender :
+            conn_xrender = self.conn(xrender.key)
+            res = conn_xrender.QueryPictFormats()
+            reply = res.reply()
+            use_pictformats = list \
+              (
+                info
+                for info in reply.formats
+                if
+                        info.type == qahirah.XCB.RENDER_PICT_TYPE_DIRECT
+                    and
+                        info.depth == 24 # 32 doesn’t seem to work with Cairo
+                    and
+                        info.direct.red_shift == 16
+                    and
+                        info.direct.green_shift == 8
+                    and
+                        info.direct.blue_shift == 0
+              )
+            assert len(use_pictformats) > 0, "no suitable pictformats found"
+            surface = XCBSurface.create_with_xrender_format \
+              (
+                connection = self.conn,
+                screen = default_screen,
+                drawable = window,
+                format = use_pictformats[0],
+                width = 10, # correct these on ConfigureNotifyEvent
+                height = 10
+              )
+        else :
+            use_visuals = list \
+              (
+                vis
+                for depth in use_root.allowed_depths
+                for vis in depth.visuals
+                if vis.visual_id == use_root.root_visual
+              )
+            assert len(use_visuals) > 0, "no suitable visuals found"
+            surface = XCBSurface.create \
+              (
+                connection = self.conn,
+                drawable = window,
+                visual = use_visuals[0],
+                width = 10, # correct these on ConfigureNotifyEvent
+                height = 10
+              )
+        #end if
+        return \
+            surface
+    #end easy_create_surface
 
 #end ConnWrapper
