@@ -206,7 +206,7 @@ class ConnWrapper :
                 self.loop.remove_reader(self.conn.get_file_descriptor())
                 result.set_result(event)
             elif conn.has_error() :
-                raise RuntimeError("error on XCB connection")
+                result.set_exception(RuntimeError("error on XCB connection"))
             else :
                 print("XCB conn readable but no event") # debug
             #end if
