@@ -9,6 +9,8 @@ with the xcffib binding.
 # Useful XCB docs:
 # <https://xcb.freedesktop.org/manual/modules.html>
 # <https://xcb.freedesktop.org/PublicApi/>
+# <https://www.x.org/releases/X11R7.5/doc/libxcb/tutorial/index.html>
+# (linked from <https://www.x.org/releases/X11R7.5/doc/>)
 
 from weakref import \
     ref as weak_ref
@@ -19,6 +21,27 @@ import xcffib
 from xcffib import \
     xproto, \
     render as xrender
+
+#+
+# Useful stuff
+#-
+
+if hasattr(asyncio, "get_running_loop") :
+    # new in Python 3.7
+    get_running_loop = asyncio.get_running_loop
+else :
+    # as long as I want to support pre-3.7...
+    get_running_loop = asyncio.get_event_loop
+#end if
+
+def get_event_loop() :
+    "Python docs indicate that asyncio.get_event_loop() is going away" \
+    " in its current form. But I still need to be able to attach objects" \
+    " to the default event loop from a non-coroutine context. So I" \
+    " reimplement its original semantics here."
+    return \
+        asyncio.get_event_loop_policy().get_event_loop()
+#end get_event_loop
 
 assert qahirah.HAS.XCB_SURFACE, "Cairo is missing XCB support"
 
@@ -191,7 +214,7 @@ class ConnWrapper :
     def __init__(self, conn, loop = None) :
         _get_conn(conn) # just a sanity check
         if loop == None :
-            loop = asyncio.get_event_loop()
+            loop = get_event_loop()
         #end if
         self.conn = conn
         self.loop = loop
