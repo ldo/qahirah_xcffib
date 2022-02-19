@@ -2,7 +2,7 @@
 with the xcffib binding.
 """
 #+
-# Copyright 2017, 2021 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+# Copyright 2017, 2022 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
 # Licensed under the GNU Lesser General Public License v2.1 or later.
 #-
 
@@ -209,7 +209,7 @@ class XCBSurface(qahirah.XCBSurface) :
 
 class ConnWrapper :
 
-    __slots__ = ("__weakref__", "conn", "loop") # to forestall typos
+    __slots__ = ("__weakref__", "conn", "loop", "_reply_await_count") # to forestall typos
 
     def __init__(self, conn, loop = None) :
         _get_conn(conn) # just a sanity check
@@ -218,6 +218,7 @@ class ConnWrapper :
         #end if
         self.conn = conn
         self.loop = loop
+        self._reply_await_count = 0
     #end __init__
 
     async def wait_for_event(self) :
@@ -243,6 +244,57 @@ class ConnWrapper :
         self.loop.add_reader(self.conn.get_file_descriptor(), handle_conn_readable)
         return await result
     #end wait_for_event
+
+    async def wait_for_reply(self, request_cookie) :
+        "awaits and returns the response from an async request. In xcffib," \
+        " these request calls return (some subclass of) the “Cookie” type." \
+        " This gets filled in with the reply to the request."
+
+        if not isinstance(request_cookie, xcffib.Cookie) :
+            raise TypeError("request_cookie is not a Cookie")
+        #end if
+
+        result = self.loop.create_future()
+        w_self = weak_ref(self)
+
+        def block_await_reply(self) :
+            # makes the synchronous xcffib call to retrieve the reply
+            # from the request cookie. This shouldn’t actually block,
+            # provided the reply is already available.
+            reply = request_cookie.reply()
+            has_error = self.conn.has_error()
+            if has_error :
+                result.set_exception(RuntimeError("error on XCB connection"))
+            #end if
+            if self._reply_await_count == 1 :
+                self.loop.remove_reader(self.conn.get_file_descriptor())
+            #end if
+            self._reply_await_count -= 1
+            if not has_error :
+                result.set_result(reply)
+            #end if
+        #end block_await_reply
+
+        def handle_conn_readable() :
+            self = w_self()
+            assert self != None, "parent ConnWrapper has gone away"
+            block_await_reply(self)
+        #end handle_conn_readable
+
+    #begin wait_for_reply
+        if isinstance(request_cookie, xcffib.VoidCookie) :
+            result.set_result(None)
+        else :
+            if self._reply_await_count == 0 :
+                self.loop.add_reader(self.conn.get_file_descriptor(), handle_conn_readable)
+            #end if
+            self._reply_await_count += 1
+            if self._reply_await_count > 1 :
+                block_await_reply(self)
+            #end if
+        #end if
+        return await result
+    #end wait_for_reply
 
     def easy_create_window(self, bounds : qahirah.Rect, border_width : int) :
         default_screen = self.conn.get_screen_pointers()[0]
