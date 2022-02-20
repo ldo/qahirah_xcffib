@@ -1,0 +1,12 @@
+This module wraps the [xcffib Python binding](https://github.com/tych0/xcffib)
+for XCB as an extension to Qahirah ([GitLab](https://gitlab.com/ldo/qahirah),
+[GitHub](https://github.com/ldo/qahirah)), my Python binding for the
+Cairo graphics library. You will need to have that installed as well.
+
+This module subclasses `qahirah.XCBSurface` with overriding create
+methods that take `Connection` and other objects as defined by xcffib
+and does appropriate conversions before passing them to the
+corresponding methods in the base class.
+
+Lawrence D'Oliveiro <ldo@geek-central.gen.nz>
+2022 February 20
