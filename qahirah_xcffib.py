@@ -209,7 +209,11 @@ class XCBSurface(qahirah.XCBSurface) :
 
 class ConnWrapper :
 
-    __slots__ = ("__weakref__", "conn", "loop", "_reply_await_count") # to forestall typos
+    __slots__ = ("__weakref__", "conn", "loop", "_reader_queue", "last_sequence")
+      # to forestall typos
+
+    sequence_jump = 1 << 30
+      # hopefully sequence numbers should never jump by this much at once
 
     def __init__(self, conn, loop = None) :
         _get_conn(conn) # just a sanity check
@@ -218,46 +222,88 @@ class ConnWrapper :
         #end if
         self.conn = conn
         self.loop = loop
-        self._reply_await_count = 0
+        self._reader_queue = []
+          # common wait queue for both events and requests/replies
+          # within limitations of libxcb, namely:
+          #   * I can block waiting for an event, or I can poll, but
+          #   * I can only block waiting for a reply to a request.
+        self.last_sequence = None
     #end __init__
 
-    async def wait_for_event(self) :
+    def _install_fd_reader(self, action, arg) :
+        # internal routine to install a reader callback on the file
+        # descriptor that is the connection to the X server, invoking
+        # the specified action when something is available to be read.
+        # action is invoked with 2 args, being this ConnWrapper object
+        # and the specified additional arg.
+        # I maintain a queue of pending callbacks, and process them
+        # in turn each time something becomes available on the
+        # connection.
 
-        result = self.loop.create_future()
         w_self = weak_ref(self)
 
         def handle_conn_readable() :
             self = w_self()
             assert self != None, "parent ConnWrapper has gone away"
+            if len(self._reader_queue) != 0 :
+                action, arg = self._reader_queue.pop(0)
+                action(self, arg)
+            #end if
+            fd = self.conn.get_file_descriptor()
+            # always remove, then add back again if needed, to avoid
+            # oddities with endless spurious calls
+            self.loop.remove_reader(fd)
+            if len(self._reader_queue) != 0 :
+                self.loop.add_reader(fd, handle_conn_readable)
+            #end if
+        #end handle_conn_readable
+
+    #begin _install_fd_reader
+        if len(self._reader_queue) == 0 :
+            self.loop.add_reader(self.conn.get_file_descriptor(), handle_conn_readable)
+        #end if
+        self._reader_queue.append((action, arg))
+    #end _install_fd_reader
+
+    def wait_for_event(self) :
+        "returns a Future that can be awaited to obtain the next input event."
+
+        result = self.loop.create_future()
+
+        def event_ready_action(self, result) :
             event = self.conn.poll_for_event()
             if event != None :
-                self.loop.remove_reader(self.conn.get_file_descriptor())
                 result.set_result(event)
             elif conn.has_error() :
                 result.set_exception(RuntimeError("error on XCB connection"))
             else :
                 print("XCB conn readable but no event") # debug
             #end if
-        #end handle_conn_readable
+        #end event_ready_action
 
     #begin wait_for_event
-        self.loop.add_reader(self.conn.get_file_descriptor(), handle_conn_readable)
-        return await result
+        self._install_fd_reader(event_ready_action, result)
+        return result
     #end wait_for_event
 
-    async def wait_for_reply(self, request_cookie) :
-        "awaits and returns the response from an async request. In xcffib," \
-        " these request calls return (some subclass of) the “Cookie” type." \
-        " This gets filled in with the reply to the request."
+    def wait_for_reply(self, request_cookie) :
+        "returns a Future that can be awaited to return the response from" \
+        " an async request. In xcffib, these request calls return (some" \
+        " subclass of) the “Cookie” type, which you pass here as the" \
+        " request_cookie. This gets filled in with the reply to the request." \
+        "\n" \
+        "Beware: this can lead to potential trouble if replies to requests" \
+        " are awaited out of order, because earlier ones will have already" \
+        " arrived, but I still wait for further data on the connection to the" \
+        " X server, which can hang if no further input arrives."
 
         if not isinstance(request_cookie, xcffib.Cookie) :
             raise TypeError("request_cookie is not a Cookie")
         #end if
 
         result = self.loop.create_future()
-        w_self = weak_ref(self)
 
-        def block_await_reply(self) :
+        def reply_ready_action(self, result) :
             # makes the synchronous xcffib call to retrieve the reply
             # from the request cookie. This shouldn’t actually block,
             # provided the reply is already available.
@@ -265,35 +311,34 @@ class ConnWrapper :
             has_error = self.conn.has_error()
             if has_error :
                 result.set_exception(RuntimeError("error on XCB connection"))
-            #end if
-            if self._reply_await_count == 1 :
-                self.loop.remove_reader(self.conn.get_file_descriptor())
-            #end if
-            self._reply_await_count -= 1
-            if not has_error :
+            else :
                 result.set_result(reply)
             #end if
-        #end block_await_reply
-
-        def handle_conn_readable() :
-            self = w_self()
-            assert self != None, "parent ConnWrapper has gone away"
-            block_await_reply(self)
-        #end handle_conn_readable
+        #end reply_ready_action
 
     #begin wait_for_reply
+        last_sequence = self.last_sequence
+        incr_sequence = \
+            (
+                last_sequence == None
+            or
+                request_cookie.sequence > last_sequence
+            or
+                request_cookie.sequence < last_sequence + self.sequence_jump
+                  # assumed wraparound
+            )
+        if incr_sequence :
+            self.last_sequence = request_cookie.sequence
+        #end if
         if isinstance(request_cookie, xcffib.VoidCookie) :
             result.set_result(None)
+        elif not incr_sequence :
+            # reply should already be available
+            reply_ready_action(self, result)
         else :
-            if self._reply_await_count == 0 :
-                self.loop.add_reader(self.conn.get_file_descriptor(), handle_conn_readable)
-            #end if
-            self._reply_await_count += 1
-            if self._reply_await_count > 1 :
-                block_await_reply(self)
-            #end if
+            self._install_fd_reader(reply_ready_action, result)
         #end if
-        return await result
+        return result
     #end wait_for_reply
 
     def easy_create_window(self, bounds : qahirah.Rect, border_width : int) :
