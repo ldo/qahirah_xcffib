@@ -319,7 +319,7 @@ class ConnWrapper :
             or
                 request_cookie.sequence > last_sequence
             or
-                request_cookie.sequence < last_sequence + self.sequence_jump
+                request_cookie.sequence + self.sequence_jump < last_sequence
                   # assumed wraparound
             )
         if incr_sequence :
