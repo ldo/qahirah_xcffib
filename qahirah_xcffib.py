@@ -290,12 +290,7 @@ class ConnWrapper :
         "returns a Future that can be awaited to return the response from" \
         " an async request. In xcffib, these request calls return (some" \
         " subclass of) the “Cookie” type, which you pass here as the" \
-        " request_cookie. This gets filled in with the reply to the request." \
-        "\n" \
-        "Beware: this can lead to potential trouble if replies to requests" \
-        " are awaited out of order, because earlier ones will have already" \
-        " arrived, but I still wait for further data on the connection to the" \
-        " X server, which can hang if no further input arrives."
+        " request_cookie. This gets filled in with the reply to the request."
 
         if not isinstance(request_cookie, xcffib.Cookie) :
             raise TypeError("request_cookie is not a Cookie")
