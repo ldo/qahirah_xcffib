@@ -382,7 +382,8 @@ class ConnWrapper :
         " associated with window creation. set_attrs is a sequence of" \
         " («bit_nr», «value») pairs where each bit_nr is a member of the CW_BIT" \
         " enumeration identifying a window attribute, and «value» is the" \
-        " corresponding integer value to set for that attribute."
+        " corresponding integer value to set for that attribute. Attributes may" \
+        " be specified in any order."
         if (
                 not isinstance(set_attrs, (tuple, list))
             or
