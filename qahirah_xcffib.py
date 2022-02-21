@@ -364,14 +364,14 @@ class ConnWrapper :
         return result
     #end wait_for_reply
 
-    def easy_create_window(self, bounds : qahirah.Rect, border_width : int, set_values) :
+    def easy_create_window(self, bounds : qahirah.Rect, border_width : int, set_attrs) :
         "convenience wrapper which handles a lot of the seeming repetitive tasks" \
-        " associated with window creation. set_values is a sequence of" \
+        " associated with window creation. set_attrs is a sequence of" \
         " («bit_nr», «value») pairs where each bit_nr is a member of the CW_BIT" \
-        " enumeration, and «value» is the corresponding value to set for that" \
-        " window attribute."
+        " enumeration identifying a window attribute, and «value» is the" \
+        " corresponding integer value to set for that attribute."
         if (
-                not isinstance(set_values, (tuple, list))
+                not isinstance(set_attrs, (tuple, list))
             or
                 not all
                   (
@@ -380,29 +380,29 @@ class ConnWrapper :
                         isinstance(i[0], CW_BIT)
                     and
                         isinstance(i[1], int)
-                    for i in set_values
+                    for i in set_attrs
                   )
         ) :
-            raise TypeError("set_values is not sequence of (CW_BIT.xxx, value) pairs")
+            raise TypeError("set_attrs is not sequence of (CW_BIT.xxx, value) pairs")
         #end if
         default_screen = self.conn.get_screen_pointers()[0]
         use_root = self.conn.get_setup().roots[0]
         window = self.conn.generate_id()
         value_mask = 0
         value_list = []
-        default_set_values = \
+        default_set_attrs = \
             ( # defaults if not specified by user
                 (CW_BIT.BACKPIXEL, use_root.white_pixel),
                 (CW_BIT.BORDERPIXEL, use_root.black_pixel),
             )
-        user_specified = set(i[0] for i in set_values)
-        set_values = \
+        user_specified = set(i[0] for i in set_attrs)
+        set_attrs = \
             (
-                tuple(set_values)
+                tuple(set_attrs)
             +
-                tuple(i for i in default_set_values if i[0] not in user_specified)
+                tuple(i for i in default_set_attrs if i[0] not in user_specified)
             )
-        for bit_nr, value in sorted(set_values, key = lambda x : x[0]) :
+        for bit_nr, value in sorted(set_attrs, key = lambda x : x[0]) :
             value_mask |= bit_nr.mask
             value_list.append(value)
         #end for
