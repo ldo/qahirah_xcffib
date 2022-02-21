@@ -12,6 +12,7 @@ with the xcffib binding.
 # <https://www.x.org/releases/X11R7.5/doc/libxcb/tutorial/index.html>
 # (linked from <https://www.x.org/releases/X11R7.5/doc/>)
 
+import enum
 from weakref import \
     ref as weak_ref
 import asyncio
@@ -207,6 +208,33 @@ class XCBSurface(qahirah.XCBSurface) :
 # Event loop
 #-
 
+class CW_BIT(enum.IntEnum) :
+    "bit numbers corresponding to bit masks for values items to create_window calls."
+    # Note: must be specified in strictly increasing order
+    BACKPIXMAP = 0
+    BACKPIXEL = 1
+    BORDERPIXMAP = 2
+    BORDERPIXEL = 3
+    BITGRAVITY = 4
+    WINGRAVITY = 5
+    BACKINGSTORE = 6
+    BACKINGPLANES = 7
+    BACKINGPIXEL = 8
+    OVERRIDEREDIRECT = 9
+    SAVEUNDER = 10
+    EVENTMASK = 11
+    DONTPROPAGATE = 12
+    COLOURMAP = 13
+    CURSOR = 14
+
+    @property
+    def mask(self) :
+        return 1 << self.value
+    #end mask
+
+#end CW_BIT
+CW_BIT.COLORMAP = CW_BIT.COLOURMAP # if you prefer
+
 class ConnWrapper :
 
     __slots__ = ("__weakref__", "conn", "loop", "_reader_queue", "last_sequence")
@@ -336,10 +364,48 @@ class ConnWrapper :
         return result
     #end wait_for_reply
 
-    def easy_create_window(self, bounds : qahirah.Rect, border_width : int) :
+    def easy_create_window(self, bounds : qahirah.Rect, border_width : int, set_values) :
+        "convenience wrapper which handles a lot of the seeming repetitive tasks" \
+        " associated with window creation. set_values is a sequence of" \
+        " («bit_nr», «value») pairs where each bit_nr is a member of the CW_BIT" \
+        " enumeration, and «value» is the corresponding value to set for that" \
+        " window attribute."
+        if (
+                not isinstance(set_values, (tuple, list))
+            or
+                not all
+                  (
+                        len(i) == 2
+                    and
+                        isinstance(i[0], CW_BIT)
+                    and
+                        isinstance(i[1], int)
+                    for i in set_values
+                  )
+        ) :
+            raise TypeError("set_values is not sequence of (CW_BIT.xxx, value) pairs")
+        #end if
         default_screen = self.conn.get_screen_pointers()[0]
         use_root = self.conn.get_setup().roots[0]
         window = self.conn.generate_id()
+        value_mask = 0
+        value_list = []
+        default_set_values = \
+            ( # defaults if not specified by user
+                (CW_BIT.BACKPIXEL, use_root.white_pixel),
+                (CW_BIT.BORDERPIXEL, use_root.black_pixel),
+            )
+        user_specified = set(i[0] for i in set_values)
+        set_values = \
+            (
+                tuple(set_values)
+            +
+                tuple(i for i in default_set_values if i[0] not in user_specified)
+            )
+        for bit_nr, value in sorted(set_values, key = lambda x : x[0]) :
+            value_mask |= bit_nr.mask
+            value_list.append(value)
+        #end for
         res = self.conn.core.CreateWindow \
           (
             depth = xcffib.XCB_COPY_FROM_PARENT,
@@ -352,21 +418,8 @@ class ConnWrapper :
             border_width = border_width,
             _class = xcffib.XCB_COPY_FROM_PARENT,
             visual = use_root.root_visual, # xcffib.XCB_COPY_FROM_PARENT,
-            value_mask = xproto.CW.BackPixel | xproto.CW.BorderPixel | xproto.CW.EventMask,
-            value_list =
-                [ # note ordering defined in xproto.py
-                    use_root.white_pixel, # BackPixel
-                    use_root.black_pixel, # BorderPixel
-                        xproto.EventMask.KeyPress # EventMask
-                    |
-                        xproto.EventMask.ButtonPress
-                    |
-                        xproto.EventMask.ButtonRelease
-                    |
-                        xproto.EventMask.Exposure
-                    |
-                        xproto.EventMask.StructureNotify,
-                ]
+            value_mask = value_mask,
+            value_list = value_list
           )
         # seems requests are not actually processed unless I call request_check...
         self.conn.request_check(res.sequence)
