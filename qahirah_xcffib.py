@@ -209,7 +209,8 @@ class XCBSurface(qahirah.XCBSurface) :
 #-
 
 class CW_BIT(enum.IntEnum) :
-    "bit numbers corresponding to bit masks for values items to create_window calls."
+    "bit numbers corresponding to bit masks for window attributes to" \
+    " create_window calls."
     # Note: must be specified in strictly increasing order
     BACKPIXMAP = 0
     BACKPIXEL = 1
@@ -427,7 +428,14 @@ class ConnWrapper :
             window
     #end easy_create_window
 
-    def easy_create_surface(self, window, use_xrender) :
+    def easy_create_surface(self, window, use_xrender : bool) :
+        "convenience routine which creates an XCBSurface for drawing" \
+        " with Cairo into the specified window, with the option of" \
+        " using xrender.\n" \
+        "\n" \
+        "Note that the surface is initially created with dummy dimensions;" \
+        " these will need to be fixed up with a set_size() call when you" \
+        " receive a ConfigureNotifyEvent for the window."
         default_screen = self.conn.get_screen_pointers()[0]
         use_root = self.conn.get_setup().roots[0]
         if use_xrender :
