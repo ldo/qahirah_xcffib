@@ -278,12 +278,19 @@ class ConnWrapper :
                 action, arg = self._reader_queue.pop(0)
                 action(self, arg)
             #end if
-            fd = self.conn.get_file_descriptor()
-            # always remove, then add back again if needed, to avoid
-            # oddities with endless spurious calls
-            self.loop.remove_reader(fd)
-            if len(self._reader_queue) != 0 :
-                self.loop.add_reader(fd, handle_conn_readable)
+            try :
+                fd = self.conn.get_file_descriptor()
+            except xcffib.ConnectionException :
+                fd = None # gone away?
+            #end try
+            if fd != None :
+                # always remove, then add back again if needed, to avoid
+                # oddities with endless spurious calls
+                self.loop.remove_reader(fd)
+                if len(self._reader_queue) != 0 :
+                    self.loop.add_reader(fd, handle_conn_readable)
+                #end if
+            # else leave to caller to deal with it
             #end if
         #end handle_conn_readable
 
@@ -300,14 +307,18 @@ class ConnWrapper :
         result = self.loop.create_future()
 
         def event_ready_action(self, result) :
-            event = self.conn.poll_for_event()
-            if event != None :
-                result.set_result(event)
-            elif conn.has_error() :
-                result.set_exception(RuntimeError("error on XCB connection"))
-            else :
-                print("XCB conn readable but no event") # debug
-            #end if
+            try :
+                event = self.conn.poll_for_event()
+                if event != None :
+                    result.set_result(event)
+                elif conn.has_error() :
+                    result.set_exception(RuntimeError("error on XCB connection"))
+                else :
+                    print("XCB conn readable but no event") # debug
+                #end if
+            except xcffib.ConnectionException as fail :
+                result.set_exception(fail)
+            #end try
         #end event_ready_action
 
     #begin wait_for_event
