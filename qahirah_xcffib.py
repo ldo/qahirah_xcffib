@@ -253,9 +253,10 @@ class ConnWrapper :
         self.loop = loop
         self._reader_queue = []
           # common wait queue for both events and requests/replies
-          # within limitations of libxcb, namely:
+          # within limitations of xcffib, namely:
           #   * I can block waiting for an event, or I can poll, but
-          #   * I can only block waiting for a reply to a request.
+          #   * I can only block waiting for a reply to a request
+          #     (xcffib doesn’t provide a wrapper for xcb_poll_for_reply).
         self.last_sequence = None
     #end __init__
 
