@@ -238,7 +238,7 @@ CW_BIT.COLORMAP = CW_BIT.COLOURMAP # if you prefer
 
 class ConnWrapper :
 
-    __slots__ = ("__weakref__", "conn", "loop", "_reader_queue", "last_sequence")
+    __slots__ = ("__weakref__", "conn", "loop", "_conn_fd", "_event_filters", "_reply_queue", "last_sequence")
       # to forestall typos
 
     sequence_jump = 1 << 30
@@ -251,8 +251,12 @@ class ConnWrapper :
         #end if
         self.conn = conn
         self.loop = loop
-        self._reader_queue = []
-          # common wait queue for both events and requests/replies
+        self._conn_fd = conn.get_file_descriptor()
+          # keep my own copy because conn.get_file_descriptor()
+          # could return an error later
+        self._event_filters = []
+        self._reply_queue = []
+          # wait queue for replies to requests
           # within limitations of xcffib, namely:
           #   * I can block waiting for an event, or I can poll, but
           #   * I can only block waiting for a reply to a request
@@ -260,70 +264,135 @@ class ConnWrapper :
         self.last_sequence = None
     #end __init__
 
-    def _install_fd_reader(self, action, arg) :
-        # internal routine to install a reader callback on the file
-        # descriptor that is the connection to the X server, invoking
-        # the specified action when something is available to be read.
-        # action is invoked with 2 args, being this ConnWrapper object
-        # and the specified additional arg.
-        # I maintain a queue of pending callbacks, and process them
-        # in turn each time something becomes available on the
-        # connection.
+    @staticmethod
+    def _handle_conn_readable(w_self) :
+        # common fd-readable callback for monitoring server connection
+        # for input.
+        self = w_self()
+        assert self != None, "parent ConnWrapper has gone away"
 
-        w_self = weak_ref(self)
-
-        def handle_conn_readable() :
-            self = w_self()
-            assert self != None, "parent ConnWrapper has gone away"
-            if len(self._reader_queue) != 0 :
-                action, arg = self._reader_queue.pop(0)
-                action(self, arg)
-            #end if
-            try :
-                fd = self.conn.get_file_descriptor()
-            except xcffib.ConnectionException :
-                fd = None # gone away?
-            #end try
-            if fd != None :
-                # always remove, then add back again if needed, to avoid
-                # oddities with endless spurious calls
-                self.loop.remove_reader(fd)
-                if len(self._reader_queue) != 0 :
-                    self.loop.add_reader(fd, handle_conn_readable)
-                #end if
-            # else leave to caller to deal with it
-            #end if
-        #end handle_conn_readable
-
-    #begin _install_fd_reader
-        if len(self._reader_queue) == 0 :
-            self.loop.add_reader(self.conn.get_file_descriptor(), handle_conn_readable)
-        #end if
-        self._reader_queue.append((action, arg))
-    #end _install_fd_reader
-
-    def wait_for_event(self) :
-        "returns a Future that can be awaited to obtain the next input event."
-
-        result = self.loop.create_future()
-
-        def event_ready_action(self, result) :
+        had_event = False
+        if len(self._event_filters) != 0 :
             try :
                 event = self.conn.poll_for_event()
-                if event != None :
-                    result.set_result(event)
-                elif conn.has_error() :
-                    result.set_exception(RuntimeError("error on XCB connection"))
-                else :
-                    print("XCB conn readable but no event") # debug
-                #end if
-            except xcffib.ConnectionException as fail :
-                result.set_exception(fail)
+            except xcffib.ConnectionException :
+                event = None
             #end try
+            had_event = event != None
+            if had_event :
+                event_filters = self._event_filters[:]
+                while True :
+                    try :
+                        action, arg = event_filters.pop(0)
+                    except IndexError :
+                        break
+                    #end try
+                    action(event, arg)
+                #end while
+            else :
+                if self.conn.has_error() :
+                    # raise RuntimeError("error on XCB connection")
+                    had_event = True # don’t bother looking for request replies
+                #end if
+            #end if
+        #end if
+
+        if not had_event and len(self._reply_queue) != 0 :
+            action, arg = self._reply_queue.pop(0)
+            action(self, arg)
+        #end if
+
+        # always remove, then add back again if needed, to avoid
+        # oddities with endless spurious calls
+        self.loop.remove_reader(self._conn_fd)
+        conn_err = None
+        try :
+            self.conn.get_file_descriptor()
+              # just to check connection is still OK
+        except xcffib.ConnectionException as err :
+            conn_err = err
+            self._conn_fd = None
+        #end try
+        if self._conn_fd != None :
+            if len(self._event_filters) + len(self._reply_queue) != 0 :
+                self.loop.add_reader(self._conn_fd, self._handle_conn_readable, w_self)
+            #end if
+        else :
+            assert conn_err != None
+            for action, arg in self._event_filters[:] :
+                action(conn_err, arg)
+            #end for
+        #end if
+    #end _handle_conn_readable
+
+    def add_event_filter(self, action, arg) :
+        "installs a filter which gets to see all incoming events."
+        if (
+            any
+              (
+                elt["action"] == action and elt["arg"] == arg
+                for i in range(len(self._event_filters))
+                for elt in (self._event_filters[i],)
+              )
+        ) :
+            raise KeyError("attempt to install duplicate action+arg")
+        #end if
+        newelt = (action, arg)
+        if len(self._event_filters) + len(self._reply_queue) == 0 :
+            self.loop.add_reader \
+              (
+                self._conn_fd,
+                self._handle_conn_readable,
+                weak_ref(self)
+              )
+        #end if
+        self._event_filters.append(newelt)
+    #end add_event_filter
+
+    def remove_event_filter(self, action, arg, optional : bool) :
+        "removes a previously-installed event filter. optional indicates" \
+        " not to report an error if no such filter is installed."
+        pos = list \
+          (
+            i
+            for i in range(len(self._event_filters))
+            for elt in (self._event_filters[i],)
+            if elt == (action, arg)
+          )
+        assert len(pos) <= 1
+        if len(pos) == 1 :
+            self._event_filters.pop(pos[0])
+            if self._conn_fd != None and len(self._event_filters) + len(self._reply_queue) == 0 :
+                self.loop.remove_reader(self._conn_fd)
+            #end if
+        elif not optional :
+            raise KeyError("specified action+arg was not installed as an event filter")
+        #end if
+    #end remove_event_filter
+
+    def wait_for_event(self) :
+        "returns a Future that can be awaited to obtain the next input event." \
+        " Note that, once an event is received, it is delivered to all pending" \
+        " waiters."
+
+        w_self = weak_ref(self)
+        result = self.loop.create_future()
+
+        def event_ready_action(event, result) :
+            self = w_self()
+            assert self != None, "parent ConnWrapper has gone away"
+            self.remove_event_filter(event_ready_action, result, optional = False)
+            if isinstance(event, xcffib.ConnectionException) :
+                result.set_exception(event)
+            elif isinstance(event, xcffib.Event) :
+                result.set_result(event)
+            else :
+                raise TypeError("unexpected type of event object %s" % repr(event))
+            #end if
         #end event_ready_action
 
     #begin wait_for_event
-        self._install_fd_reader(event_ready_action, result)
+        self.add_event_filter(event_ready_action, result)
         return result
     #end wait_for_event
 
@@ -372,7 +441,16 @@ class ConnWrapper :
             # reply should already be available
             reply_ready_action(self, result)
         else :
-            self._install_fd_reader(reply_ready_action, result)
+            newelt = (reply_ready_action, result)
+            if len(self._event_filters) + len(self._reply_queue) == 0 :
+                self.loop.add_reader \
+                  (
+                    self._conn_fd,
+                    self._handle_conn_readable,
+                    weak_ref(self)
+                  )
+            #end if
+            self._reply_queue.append(newelt)
         #end if
         return result
     #end wait_for_reply
