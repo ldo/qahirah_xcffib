@@ -330,7 +330,7 @@ class ConnWrapper :
         if (
             any
               (
-                elt["action"] == action and elt["arg"] == arg
+                elt == (action, arg)
                 for i in range(len(self._event_filters))
                 for elt in (self._event_filters[i],)
               )
