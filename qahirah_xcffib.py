@@ -382,7 +382,7 @@ class ConnWrapper :
             self = w_self()
             assert self != None, "parent ConnWrapper has gone away"
             self.remove_event_filter(event_ready_action, result, optional = False)
-            if isinstance(event, xcffib.ConnectionException) :
+            if isinstance(event, Exception) :
                 result.set_exception(event)
             elif isinstance(event, xcffib.Event) :
                 result.set_result(event)
