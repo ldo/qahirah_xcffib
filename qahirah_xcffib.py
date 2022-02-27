@@ -455,13 +455,7 @@ class ConnWrapper :
         return result
     #end wait_for_reply
 
-    def easy_create_window(self, bounds : qahirah.Rect, border_width : int, set_attrs) :
-        "convenience wrapper which handles a lot of the seeming repetitive tasks" \
-        " associated with window creation. set_attrs is a sequence of" \
-        " («bit_nr», «value») pairs where each bit_nr is a member of the CW_BIT" \
-        " enumeration identifying a window attribute, and «value» is the" \
-        " corresponding integer value to set for that attribute. Attributes may" \
-        " be specified in any order."
+    def _easy_create_window(self, bounds : qahirah.Rect, border_width : int, set_attrs) :
         if (
                 not isinstance(set_attrs, (tuple, list))
             or
@@ -513,11 +507,30 @@ class ConnWrapper :
             value_mask = value_mask,
             value_list = value_list
           )
-        # seems requests are not actually processed unless I call request_check...
+        return \
+            window, res
+    #end easy_create_window
+
+    def easy_create_window(self, bounds : qahirah.Rect, border_width : int, set_attrs) :
+        "convenience wrapper which handles a lot of the seeming repetitive tasks" \
+        " associated with window creation. set_attrs is a sequence of" \
+        " («bit_nr», «value») pairs where each bit_nr is a member of the CW_BIT" \
+        " enumeration identifying a window attribute, and «value» is the" \
+        " corresponding integer value to set for that attribute. Attributes may" \
+        " be specified in any order."
+        window, res = self._easy_create_window(bounds, border_width, set_attrs)
         self.conn.request_check(res.sequence)
         return \
             window
     #end easy_create_window
+
+    async def easy_create_window_async(self, bounds : qahirah.Rect, border_width : int, set_attrs) :
+        "async version of easy_create_window convenience wrapper."
+        window, res = self._easy_create_window(bounds, border_width, set_attrs)
+        await self.await_reply(res)
+        return \
+            window
+    #end easy_create_window_async
 
     def easy_create_surface(self, window, use_xrender : bool) :
         "convenience routine which creates an XCBSurface for drawing" \
