@@ -459,6 +459,7 @@ class ConnWrapper :
     #end wait_for_reply
 
     def _easy_create_window(self, bounds : qahirah.Rect, border_width : int, set_attrs) :
+        # common code for both easy_create_window and easy_create_window_async.
         if (
                 not isinstance(set_attrs, (tuple, list))
             or
@@ -512,7 +513,7 @@ class ConnWrapper :
           )
         return \
             window, res
-    #end easy_create_window
+    #end _easy_create_window
 
     def easy_create_window(self, bounds : qahirah.Rect, border_width : int, set_attrs) :
         "convenience wrapper which handles a lot of the seeming repetitive tasks" \
@@ -548,7 +549,7 @@ class ConnWrapper :
         if use_xrender :
             conn_xrender = self.conn(xrender.key)
             res = conn_xrender.QueryPictFormats()
-            reply = res.reply()
+            reply = res.reply() # could offer async alternative here
             use_pictformats = list \
               (
                 info
