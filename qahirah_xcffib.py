@@ -281,6 +281,7 @@ class ConnWrapper :
             had_event = event != None
             if had_event :
                 event_filters = self._event_filters[:]
+                  # copy in case actions make changes
                 while True :
                     try :
                         action, arg = event_filters.pop(0)
@@ -320,13 +321,15 @@ class ConnWrapper :
         else :
             assert conn_err != None
             for action, arg in self._event_filters[:] :
+              # copy in case actions make changes
                 action(conn_err, arg)
             #end for
         #end if
     #end _handle_conn_readable
 
     def add_event_filter(self, action, arg) :
-        "installs a filter which gets to see all incoming events."
+        "installs a filter which gets to see all incoming events. It is invoked" \
+        " as “action(event, arg) where the meaning of arg is up to you”."
         if (
             any
               (
@@ -527,7 +530,7 @@ class ConnWrapper :
     async def easy_create_window_async(self, bounds : qahirah.Rect, border_width : int, set_attrs) :
         "async version of easy_create_window convenience wrapper."
         window, res = self._easy_create_window(bounds, border_width, set_attrs)
-        await self.await_reply(res)
+        await self.wait_for_reply(res)
         return \
             window
     #end easy_create_window_async
