@@ -61,6 +61,9 @@ def _get_conn(connection) :
         int(_ffi.cast(_ffi_size_t, connection._conn))
 #end _get_conn
 
+KEYCODE_MIN = 8
+KEYCODE_MAX = 255
+
 class XK :
     "some useful keysyms, extracted from /usr/include/X11/keysymdef.h."
 
@@ -357,6 +360,36 @@ KEYSYM_NAME = dict \
     for n in dir(XK)
     if not n.startswith("_")
   )
+
+KEYSYM_KEYPAD = frozenset \
+  (
+    getattr(XK, n)
+    for n in dir(XK)
+    if n.startswith("KP_")
+  )
+
+class STATE(enum.IntEnum) :
+    "modifier bits."
+    SHIFT = 0
+    LOCK = 1
+    CTRL = 2
+    MOD1 = 3 # PC keyboards: Alt or Meta
+    MOD2 = 4 # PC keyboards: Num Lock
+    MOD3 = 5
+    MOD4 = 6 # Super (PC keyboards: logo key)
+    MOD5 = 7
+    BUTTON1 = 8
+    BUTTON2 = 9
+    BUTTON3 = 10
+    BUTTON4 = 11
+    BUTTON5 = 12
+
+    @property
+    def mask(self) :
+        return 1 << self.value
+    #end mask
+
+#end STATE
 
 #+
 # Needed Cairo interface types
@@ -897,6 +930,122 @@ class ConnWrapper :
     #end easy_create_surface
 
 #end ConnWrapper
+
+class KeyMapping :
+    "implements the rules for mapping keycodes to keysyms as per" \
+    " the X11 spec. lock_is_shift_lock is True to interpret the Lock" \
+    " modifier as shift lock, False to interpret as caps lock."
+
+    __slots__ = \
+        (
+            "__weakref__",
+            "_code_syms",
+            "mode_switch_mod",
+            "numlock_mod",
+            "lock_is_shift_lock",
+        ) # to forestall typos
+
+    def __init__(self, mapping, start_keycode) :
+        "mapping is the reply object from a GetKeyboardMapping request."
+        code_syms = {}
+        keysyms = list(mapping.keysyms)
+        for i in range(len(keysyms) // mapping.keysyms_per_keycode) :
+            seg = keysyms \
+              [i * mapping.keysyms_per_keycode : (i + 1) * mapping.keysyms_per_keycode] \
+              [:4]
+            # According to X11 core spec, first two entries form “group 1”, next two
+            # form “group 2”. Spec does not define what to do with rest, so I forget
+            # them.
+            seg += [0] * (4 - len(seg))
+            for j in range(1, len(seg)) :
+                # propagate defaults
+                if seg[j] == 0 :
+                    seg[j] = seg[j - 1]
+                #end if
+            #end for
+            if seg[0] != 0 : # <=> all entries are nonzero
+                code_syms[i + start_keycode] = seg
+            #end if
+        #end for
+        self._code_syms = code_syms
+        self.mode_switch_mod = None
+        self.numlock_mod = STATE.MOD2
+        self.lock_is_shift_lock = False
+    #end __init__
+
+    @classmethod
+    def obtain_from(celf, conn : ConnWrapper) :
+        if not isinstance(conn, ConnWrapper) :
+            raise TypeError("conn must be a ConnWrapper")
+        #end if
+        res = conn.conn.core.GetKeyboardMapping(KEYCODE_MIN, KEYCODE_MAX - KEYCODE_MIN + 1)
+        mapping = res.reply()
+        return \
+            celf(mapping, KEYCODE_MIN)
+    #end obtain_from
+
+    @classmethod
+    async def obtain_from_async(celf, conn : ConnWrapper) :
+        if not isinstance(conn, ConnWrapper) :
+            raise TypeError("conn must be a ConnWrapper")
+        #end if
+        mapping = await conn.wait_for_reply \
+          (
+            conn.conn.core.GetKeyboardMapping(KEYCODE_MIN, KEYCODE_MAX - KEYCODE_MIN + 1)
+          )
+        return \
+            celf(mapping, KEYCODE_MIN)
+    #end obtain_from_async
+
+    def map_simple(self, evt : xproto.KeyPressEvent) :
+        "maps a given key-press event to an appropriate keysym according" \
+        " to the rules in the core X11 spec."
+        if not isinstance(evt, xproto.KeyPressEvent) :
+            raise TypeError("evt is not a KeyPressEvent")
+        #end if
+        if self.mode_switch_mod != None and not isinstance(self.mode_switch_mod, STATE) :
+            raise TypeError("mode_switch_mod must be a STATE enum")
+        #end if
+        if self.numlock_mod != None and not isinstance(self.numlock_mod, STATE) :
+            raise TypeError("numlock_mod must be a STATE enum")
+        #end if
+        keysym = XK.VoidSymbol # to begin with
+        entry = self._code_syms.get(evt.detail)
+        if entry != None :
+            if self.mode_switch_mod != None and evt.state & mode_switch_mod.mask != 0 :
+                entry = entry[2:4]
+            else :
+                entry = entry[0:2]
+            #end if
+            shift = evt.state & STATE.SHIFT.mask != 0
+            lock = evt.state & STATE.LOCK.mask != 0
+            numlock = self.numlock_mod != None and evt.state & self.numlock_mod.mask != 0
+            if numlock and entry[1] in KEYSYM_KEYPAD :
+                if shift or lock and self.lock_is_shift_lock :
+                    keysym = entry[0]
+                else :
+                    keysym = entry[1]
+                #end if
+            elif not (shift or lock) :
+                keysym = entry[0]
+            elif lock and not self.lock_is_shift_lock :
+                if shift :
+                    keysym = entry[1]
+                else :
+                    keysym = entry[0]
+                #end if
+                if ord("a") <= keysym <= ord("z") :
+                    keysym -= ord("a") - ord("A")
+                #end if
+            elif shift or lock and self.lock_is_shift_lock :
+                keysym = entry[1]
+            #end if
+        #end if
+        return \
+            keysym
+    #end map_simple
+
+#end KeyMapping
 
 class WindowWrapper :
     "convenience wrapper object around a specific X11 window, with" \
