@@ -59,6 +59,303 @@ def _get_conn(connection) :
         int(_ffi.cast(_ffi_size_t, connection._conn))
 #end _get_conn
 
+class XK :
+    "some useful keysyms, extracted from /usr/include/X11/keysymdef.h."
+
+    VoidSymbol = 0xffffff
+
+    BackSpace = 0xff08
+    Tab = 0xff09
+    Linefeed = 0xff0a
+    Clear = 0xff0b
+    Return = 0xff0d
+    Pause = 0xff13
+    Scroll_Lock = 0xff14
+    Sys_Req = 0xff15
+    Escape = 0xff1b
+    Delete = 0xffff
+
+    Multi_key = 0xff20
+    Codeinput = 0xff37
+    SingleCandidate = 0xff3c
+    MultipleCandidate = 0xff3d
+    PreviousCandidate = 0xff3e
+
+    Home = 0xff50
+    Left = 0xff51
+    Up = 0xff52
+    Right = 0xff53
+    Down = 0xff54
+    Prior = Page_Up = 0xff55
+    Next = Page_Down = 0xff56
+    End = 0xff57
+    Begin = 0xff58
+
+    Select = 0xff60
+    Print = 0xff61
+    Execute = 0xff62
+    Insert = 0xff63
+    Undo = 0xff65
+    Redo = 0xff66
+    Menu = 0xff67
+    Find = 0xff68
+    Cancel = 0xff69
+    Help = 0xff6a
+    Break = 0xff6b
+    Mode_switch = script_switch = 0xff7e
+    Num_Lock = 0xff7f
+
+    KP_Space = 0xff80
+    KP_Tab = 0xff89
+    KP_Enter = 0xff8d
+    KP_F1 = 0xff91
+    KP_F2 = 0xff92
+    KP_F3 = 0xff93
+    KP_F4 = 0xff94
+    KP_Home = 0xff95
+    KP_Left = 0xff96
+    KP_Up = 0xff97
+    KP_Right = 0xff98
+    KP_Down = 0xff99
+    KP_Prior = KP_Page_Up = 0xff9a
+    KP_Next = KP_Page_Down = 0xff9b
+    KP_End = 0xff9c
+    KP_Begin = 0xff9d
+    KP_Insert = 0xff9e
+    KP_Delete = 0xff9f
+    KP_Equal = 0xffbd
+    KP_Multiply = 0xffaa
+    KP_Add = 0xffab
+    KP_Separator = 0xffac
+    KP_Subtract = 0xffad
+    KP_Decimal = 0xffae
+    KP_Divide = 0xffaf
+
+    KP_0 = 0xffb0
+    KP_1 = 0xffb1
+    KP_2 = 0xffb2
+    KP_3 = 0xffb3
+    KP_4 = 0xffb4
+    KP_5 = 0xffb5
+    KP_6 = 0xffb6
+    KP_7 = 0xffb7
+    KP_8 = 0xffb8
+    KP_9 = 0xffb9
+
+    F1 = 0xffbe
+    F2 = 0xffbf
+    F3 = 0xffc0
+    F4 = 0xffc1
+    F5 = 0xffc2
+    F6 = 0xffc3
+    F7 = 0xffc4
+    F8 = 0xffc5
+    F9 = 0xffc6
+    F10 = 0xffc7
+    F11 = L1 = 0xffc8
+    F12 = L2 = 0xffc9
+    F13 = L3 = 0xffca
+    F14 = L4 = 0xffcb
+    F15 = L5 = 0xffcc
+    F16 = L6 = 0xffcd
+    F17 = L7 = 0xffce
+    F18 = L8 = 0xffcf
+    F19 = L9 = 0xffd0
+    F20 = L10 = 0xffd1
+    F21 = R1 = 0xffd2
+    F22 = R2 = 0xffd3
+    F23 = R3 = 0xffd4
+    F24 = R4 = 0xffd5
+    F25 = R5 = 0xffd6
+    F26 = R6 = 0xffd7
+    F27 = R7 = 0xffd8
+    F28 = R8 = 0xffd9
+    F29 = R9 = 0xffda
+    F30 = R10 = 0xffdb
+    F31 = R11 = 0xffdc
+    F32 = R12 = 0xffdd
+    F33 = R13 = 0xffde
+    F34 = R14 = 0xffdf
+    F35 = R15 = 0xffe0
+
+    Shift_L = 0xffe1
+    Shift_R = 0xffe2
+    Control_L = 0xffe3
+    Control_R = 0xffe4
+    Caps_Lock = 0xffe5
+    Shift_Lock = 0xffe6
+
+    Meta_L = 0xffe7
+    Meta_R = 0xffe8
+    Alt_L = 0xffe9
+    Alt_R = 0xffea
+    Super_L = 0xffeb
+    Super_R = 0xffec
+    Hyper_L = 0xffed
+    Hyper_R = 0xffee
+
+    ISO_Lock = 0xfe01
+    ISO_Level2_Latch = 0xfe02
+    ISO_Level3_Shift = 0xfe03
+    ISO_Level3_Latch = 0xfe04
+    ISO_Level3_Lock = 0xfe05
+    ISO_Level5_Shift = 0xfe11
+    ISO_Level5_Latch = 0xfe12
+    ISO_Level5_Lock = 0xfe13
+    ISO_Group_Shift = 0xff7e
+    ISO_Group_Latch = 0xfe06
+    ISO_Group_Lock = 0xfe07
+    ISO_Next_Group = 0xfe08
+    ISO_Next_Group_Lock = 0xfe09
+    ISO_Prev_Group = 0xfe0a
+    ISO_Prev_Group_Lock = 0xfe0b
+    ISO_First_Group = 0xfe0c
+    ISO_First_Group_Lock = 0xfe0d
+    ISO_Last_Group = 0xfe0e
+    ISO_Last_Group_Lock = 0xfe0f
+
+    ISO_Left_Tab = 0xfe20
+    ISO_Move_Line_Up = 0xfe21
+    ISO_Move_Line_Down = 0xfe22
+    ISO_Partial_Line_Up = 0xfe23
+    ISO_Partial_Line_Down = 0xfe24
+    ISO_Partial_Space_Left = 0xfe25
+    ISO_Partial_Space_Right = 0xfe26
+    ISO_Set_Margin_Left = 0xfe27
+    ISO_Set_Margin_Right = 0xfe28
+    ISO_Release_Margin_Left = 0xfe29
+    ISO_Release_Margin_Right = 0xfe2a
+    ISO_Release_Both_Margins = 0xfe2b
+    ISO_Fast_Cursor_Left = 0xfe2c
+    ISO_Fast_Cursor_Right = 0xfe2d
+    ISO_Fast_Cursor_Up = 0xfe2e
+    ISO_Fast_Cursor_Down = 0xfe2f
+    ISO_Continuous_Underline = 0xfe30
+    ISO_Discontinuous_Underline = 0xfe31
+    ISO_Emphasize = 0xfe32
+    ISO_Center_Object = 0xfe33
+    ISO_Enter = 0xfe34
+
+    dead_grave = 0xfe50
+    dead_acute = 0xfe51
+    dead_circumflex = 0xfe52
+    dead_tilde = 0xfe53
+    dead_perispomeni = 0xfe53
+    dead_macron = 0xfe54
+    dead_breve = 0xfe55
+    dead_abovedot = 0xfe56
+    dead_diaeresis = 0xfe57
+    dead_abovering = 0xfe58
+    dead_doubleacute = 0xfe59
+    dead_caron = 0xfe5a
+    dead_cedilla = 0xfe5b
+    dead_ogonek = 0xfe5c
+    dead_iota = 0xfe5d
+    dead_voiced_sound = 0xfe5e
+    dead_semivoiced_sound = 0xfe5f
+    dead_belowdot = 0xfe60
+    dead_hook = 0xfe61
+    dead_horn = 0xfe62
+    dead_stroke = 0xfe63
+    dead_abovecomma = dead_psili = 0xfe64
+    dead_abovereversedcomma = dead_dasia = 0xfe65
+    dead_doublegrave = 0xfe66
+    dead_belowring = 0xfe67
+    dead_belowmacron = 0xfe68
+    dead_belowcircumflex = 0xfe69
+    dead_belowtilde = 0xfe6a
+    dead_belowbreve = 0xfe6b
+    dead_belowdiaeresis = 0xfe6c
+    dead_invertedbreve = 0xfe6d
+    dead_belowcomma = 0xfe6e
+    dead_currency = 0xfe6f
+
+    dead_lowline = 0xfe90
+    dead_aboveverticalline = 0xfe91
+    dead_belowverticalline = 0xfe92
+    dead_longsolidusoverlay = 0xfe93
+
+    dead_a = 0xfe80
+    dead_A = 0xfe81
+    dead_e = 0xfe82
+    dead_E = 0xfe83
+    dead_i = 0xfe84
+    dead_I = 0xfe85
+    dead_o = 0xfe86
+    dead_O = 0xfe87
+    dead_u = 0xfe88
+    dead_U = 0xfe89
+    dead_small_schwa = 0xfe8a
+    dead_capital_schwa = 0xfe8b
+
+    dead_greek = 0xfe8c
+
+    First_Virtual_Screen = 0xfed0
+    Prev_Virtual_Screen = 0xfed1
+    Next_Virtual_Screen = 0xfed2
+    Last_Virtual_Screen = 0xfed4
+    Terminate_Server = 0xfed5
+
+    AccessX_Enable = 0xfe70
+    AccessX_Feedback_Enable = 0xfe71
+    RepeatKeys_Enable = 0xfe72
+    SlowKeys_Enable = 0xfe73
+    BounceKeys_Enable = 0xfe74
+    StickyKeys_Enable = 0xfe75
+    MouseKeys_Enable = 0xfe76
+    MouseKeys_Accel_Enable = 0xfe77
+    Overlay1_Enable = 0xfe78
+    Overlay2_Enable = 0xfe79
+    AudibleBell_Enable = 0xfe7a
+
+    Pointer_Left = 0xfee0
+    Pointer_Right = 0xfee1
+    Pointer_Up = 0xfee2
+    Pointer_Down = 0xfee3
+    Pointer_UpLeft = 0xfee4
+    Pointer_UpRight = 0xfee5
+    Pointer_DownLeft = 0xfee6
+    Pointer_DownRight = 0xfee7
+    Pointer_Button_Dflt = 0xfee8
+    Pointer_Button1 = 0xfee9
+    Pointer_Button2 = 0xfeea
+    Pointer_Button3 = 0xfeeb
+    Pointer_Button4 = 0xfeec
+    Pointer_Button5 = 0xfeed
+    Pointer_DblClick_Dflt = 0xfeee
+    Pointer_DblClick1 = 0xfeef
+    Pointer_DblClick2 = 0xfef0
+    Pointer_DblClick3 = 0xfef1
+    Pointer_DblClick4 = 0xfef2
+    Pointer_DblClick5 = 0xfef3
+    Pointer_Drag_Dflt = 0xfef4
+    Pointer_Drag1 = 0xfef5
+    Pointer_Drag2 = 0xfef6
+    Pointer_Drag3 = 0xfef7
+    Pointer_Drag4 = 0xfef8
+    Pointer_Drag5 = 0xfefd
+
+    Pointer_EnableKeys = 0xfef9
+    Pointer_Accelerate = 0xfefa
+    Pointer_DfltBtnNext = 0xfefb
+    Pointer_DfltBtnPrev = 0xfefc
+
+    ch = 0xfea0
+    Ch = 0xfea1
+    CH = 0xfea2
+    c_h = 0xfea3
+    C_h = 0xfea4
+    C_H = 0xfea5
+
+#end XK
+
+KEYSYM_NAME = dict \
+  ( # keysym value to name
+    (getattr(XK, n), n)
+    for n in dir(XK)
+    if not n.startswith("_")
+  )
+
 #+
 # Needed Cairo interface types
 #-
