@@ -14,8 +14,10 @@ with the xcffib binding.
 
 import enum
 from weakref import \
-    ref as weak_ref
+    ref as weak_ref, \
+    WeakValueDictionary
 import asyncio
+import atexit
 import qahirah
 import cffi
 import xcffib
@@ -895,3 +897,175 @@ class ConnWrapper :
     #end easy_create_surface
 
 #end ConnWrapper
+
+class WindowWrapper :
+    "convenience wrapper object around a specific X11 window, with" \
+    " appropriately-filtered event dispatching."
+
+    __slots__ = ("__weakref__", "window", "conn", "loop", "_event_filters") # to forestall typos
+
+    _instances = WeakValueDictionary()
+
+    def __new__(celf, conn, window) :
+        self = celf._instances.get(window)
+        if self == None :
+            self = super().__new__(celf)
+            self.conn = conn
+            self.window = window
+            self._event_filters = []
+            self.loop = conn.loop
+            celf._instances[window] = self
+            self.conn.add_event_filter(self._conn_event_filter, weak_ref(self))
+        #end if
+        return \
+            self
+    #end __new__
+
+    def __del__(self) :
+        if self.conn != None :
+            self.conn.remove_event_filter(self._conn_event_filter, weak_ref(self), optional = True)
+            self.conn = None
+            del type(self)._instances[self.window]
+        #end if
+    #end __del__
+
+    @classmethod
+    def get_window(celf, window) :
+        "given an X11 window ID, returns the corresponding WindowWrapper object." \
+        " Assumes one already exists!"
+        return \
+            celf._instances[window]
+    #end get_window
+
+    @staticmethod
+    def _conn_event_filter(event, w_self) :
+        self = w_self()
+        assert self != None, "parent WindowWrapper has gone away"
+        if isinstance(event, Exception) or event.window == self.window :
+            event_filters = self._event_filters[:]
+              # copy in case actions make changes
+            while True :
+                try :
+                    action, arg = event_filters.pop(0)
+                except IndexError :
+                    break
+                #end try
+                action(self, event, arg)
+            #end while
+        #end if
+    #end _conn_event_filter
+
+    def add_event_filter(self, action, arg) :
+        "installs a filter which gets to see all incoming events for this window." \
+        " It is invoked as “action(window, event, arg)” where the meaning of arg" \
+        " is up to you."
+        if (
+            any
+              (
+                elt == (action, arg)
+                for i in range(len(self._event_filters))
+                for elt in (self._event_filters[i],)
+              )
+        ) :
+            raise KeyError("attempt to install duplicate action+arg")
+        #end if
+        self._event_filters.append((action, arg))
+    #end add_event_filter
+
+    def remove_event_filter(self, action, arg, optional : bool) :
+        "removes a previously-installed event filter. optional indicates" \
+        " not to report an error if no such filter is installed."
+        pos = list \
+          (
+            i
+            for i in range(len(self._event_filters))
+            for elt in (self._event_filters[i],)
+            if elt == (action, arg)
+          )
+        assert len(pos) <= 1
+        if len(pos) == 1 :
+            self._event_filters.pop(pos[0])
+        elif not optional :
+            raise KeyError("specified action+arg was not installed as an event filter")
+        #end if
+    #end remove_event_filter
+
+    @classmethod
+    def easy_create(celf, conn, bounds : qahirah.Rect, border_width : int, set_attrs) :
+        if not isinstance(conn, ConnWrapper) :
+            raise TypeError("conn must be a ConnWrapper")
+        #end if
+        window = conn.easy_create_window(bounds, border_width, set_attrs)
+        return \
+            celf(conn, window)
+    #end easy_create
+
+    @classmethod
+    async def easy_create_async(celf, conn, bounds : qahirah.Rect, border_width : int, set_attrs) :
+        if not isinstance(conn, ConnWrapper) :
+            raise TypeError("conn must be a ConnWrapper")
+        #end if
+        window = await conn.easy_create_window_async(bounds, border_width, set_attrs)
+        return \
+            celf(conn, window)
+    #end easy_create_async
+
+    def destroy(self) :
+        res = self.conn.core.DestroyWindow(self.window)
+        self.conn.request_check(res.sequence)
+    #end destroy
+
+    def destroy_async(self) :
+        res = self.conn.core.DestroyWindow(self.window)
+        return \
+            self.conn.wait_for_reply(res)
+    #end destroy_async
+
+    def wait_for_event(self) :
+        "returns a Future that can be awaited to obtain the next input event for" \
+        " this window. Note that, once an event is received, it is delivered to" \
+        " all pending waiters."
+
+        result = self.loop.create_future()
+
+        def event_ready_action(self, event, result) :
+            self.remove_event_filter(event_ready_action, result, optional = False)
+            if isinstance(event, Exception) :
+                result.set_exception(event)
+            elif isinstance(event, xcffib.Event) :
+                result.set_result(event)
+            else :
+                raise TypeError("unexpected type of event object %s" % repr(event))
+            #end if
+        #end event_ready_action
+
+    #begin wait_for_event
+        self.add_event_filter(event_ready_action, result)
+        return result
+    #end wait_for_event
+
+    def easy_create_surface(self, use_xrender : bool) :
+        "convenience routine which creates an XCBSurface for drawing" \
+        " with Cairo into this window, with the option of using xrender.\n" \
+        "\n" \
+        "Note that the surface is initially created with dummy dimensions;" \
+        " these will need to be fixed up with a set_size() call when you" \
+        " receive a ConfigureNotifyEvent for the window."
+        return \
+            self.conn.easy_create_surface(self.window, use_xrender)
+    #end easy_create_surface
+
+#end WindowWrapper
+
+#+
+# Cleanup
+#-
+
+def _atexit() :
+    # disable all __del__ methods at process termination to avoid segfaults
+    for cłass in (WindowWrapper,) :
+        delattr(cłass, "__del__")
+    #end for
+#end _atexit
+atexit.register(_atexit)
+del _atexit
