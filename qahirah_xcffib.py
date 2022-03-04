@@ -1231,7 +1231,7 @@ class WindowWrapper :
             self.window = window
             user_data = celf._ud_refs.get(window)
             if user_data == None :
-                user_data = UserDataDict()
+                user_data = qahirah.UserDataDict()
                 celf._ud_refs[window] = user_data
             #end if
             self.user_data = user_data
