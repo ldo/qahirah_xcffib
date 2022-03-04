@@ -963,6 +963,15 @@ class AtomCache :
         self.atom_to_name = {}
     #end __init__
 
+    def __repr__(self) :
+        return \
+            "(%s)" % ", ".join \
+              (
+                "(%s, %d)" % (repr(k), self.name_to_atom[k])
+                for k in self.name_to_atom
+              )
+    #end __repr__
+
     def intern_atom(self, name, only_if_exists) :
         "maps a name string to an atom ID, creating a new mapping unless" \
         " only_if_exists. Returns None if there is no such mapping."
