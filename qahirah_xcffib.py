@@ -956,9 +956,17 @@ class ConnWrapper :
 class AtomCache :
     "two-way mapping between atom IDs and corresponding name strings, with" \
     " caching to reduce communication with X server."
-    # FIXME: guard against concurrent async calls
 
-    __slots__ = ("__weakref__", "conn", "name_to_atom", "atom_to_name") # to forestall typos
+    __slots__ = \
+        (
+            "__weakref__",
+            "conn",
+            "name_to_atom",
+            "atom_to_name",
+            "_lookup_await",
+            "_lookup_current",
+            "_wakeup_current",
+        ) # to forestall typos
 
     def __init__(self, conn) :
         if not isinstance(conn, ConnWrapper) :
@@ -967,6 +975,9 @@ class AtomCache :
         self.conn = conn
         self.name_to_atom = {}
         self.atom_to_name = {}
+        self._lookup_await = []
+        self._lookup_current = None
+        self._wakeup_current = None
     #end __init__
 
     def __repr__(self) :
@@ -1018,6 +1029,14 @@ class AtomCache :
         if name in self.name_to_atom :
             result = self.name_to_atom[name]
         else :
+            if self._lookup_current != None :
+                # ask them to wake me up when they’re done
+                awaiting = self.conn.loop.create_future()
+                self._lookup_await.append(awaiting)
+                await awaiting
+                self._lookup_await.remove(awaiting)
+            #end if
+            assert self._lookup_current == None
             res = self.conn.conn.core.InternAtom \
               (
                 only_if_exists = not create_if,
@@ -1025,13 +1044,44 @@ class AtomCache :
                 name = name
               )
             self.conn.conn.flush()
-            reply = await self.conn.wait_for_reply(res)
+            awaiting = self.conn.wait_for_reply(res)
+            self._lookup_current = awaiting
+            reply = await awaiting
+            assert self._lookup_current == awaiting
+            self._lookup_current = None
             result = reply.atom
             if result != 0 :
                 self.name_to_atom[name] = result
                 self.atom_to_name[result] = name
             else :
                 result = None
+            #end if
+            if self._wakeup_current != None :
+                # return the favour to whomever woke me up
+                if not self._wakeup_current.done() :
+                    self._wakeup_current.set_result(None)
+                #end if
+            else :
+                # wake up anybody who might have been waiting for me to finish
+                waiters = self._lookup_await[:]
+                awaiting = None
+                for waiter in waiters :
+                    if not waiter.done() :
+                        waiter.set_result(None)
+                        # but this is not enough to actually let them run,
+                        # which is why I need the _wakeup_current handshake (below)
+                        if awaiting == None :
+                            awaiting = self.conn.loop.create_future()
+                        #end if
+                    #end if
+                #end for
+                if awaiting != None :
+                    # need to give a chance for somebody I just woke up to run
+                    self._wakeup_current = awaiting
+                    await awaiting
+                    assert self._wakeup_current == awaiting
+                    self._wakeup_current = None
+                #end if
             #end if
         #end if
         return \
@@ -1066,12 +1116,52 @@ class AtomCache :
         if atom in self.atom_to_name :
             result = self.atom_to_name[atom]
         else :
+            if self._lookup_current != None :
+                # ask them to wake me up when they’re done
+                awaiting = self.conn.loop.create_future()
+                self._lookup_await.append(awaiting)
+                await awaiting
+                self._lookup_await.remove(awaiting)
+            #end if
+            assert self._lookup_current == None
             res = self.conn.conn.core.GetAtomName(atom)
             self.conn.conn.flush()
             reply = await self.conn.wait_for_reply(res)
+            awaiting = self.conn.wait_for_reply(res)
+            self._lookup_current = awaiting
+            reply = await awaiting
+            assert self._lookup_current == awaiting
+            self._lookup_current = None
             result = b"".join(reply.name)
             self.name_to_atom[result] = atom
             self.atom_to_name[atom] = result
+            if self._wakeup_current != None :
+                # return the favour to whomever woke me up
+                if not self._wakeup_current.done() :
+                    self._wakeup_current.set_result(None)
+                #end if
+            else :
+                # wake up anybody who might have been waiting for me to finish
+                waiters = self._lookup_await[:]
+                awaiting = None
+                for waiter in waiters :
+                    if not waiter.done() :
+                        waiter.set_result(None)
+                        # but this is not enough to actually let them run,
+                        # which is why I need the _wakeup_current handshake (below)
+                        if awaiting == None :
+                            awaiting = self.conn.loop.create_future()
+                        #end if
+                    #end if
+                #end for
+                if awaiting != None :
+                    # need to give a chance for somebody I just woke up to run
+                    self._wakeup_current = awaiting
+                    await awaiting
+                    assert self._wakeup_current == awaiting
+                    self._wakeup_current = None
+                #end if
+            #end if
         #end if
         if decode :
             result = result.decode()
