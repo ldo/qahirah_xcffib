@@ -533,7 +533,7 @@ class XCBSurface(qahirah.XCBSurface) :
 #end XCBSurface
 
 #+
-# Event loop
+# Main classes
 #-
 
 class CW_BIT(enum.IntEnum) :
@@ -566,8 +566,17 @@ CW_BIT.COLORMAP = CW_BIT.COLOURMAP # if you prefer
 
 class ConnWrapper :
 
-    __slots__ = ("__weakref__", "conn", "loop", "_conn_fd", "_event_filters", "_reply_queue", "last_sequence")
-      # to forestall typos
+    __slots__ = \
+        (
+            "__weakref__",
+            "conn",
+            "loop",
+            "user_data",
+            "_conn_fd",
+            "_event_filters",
+            "_reply_queue",
+            "last_sequence",
+        ) # to forestall typos
 
     sequence_jump = 1 << 30
       # hopefully sequence numbers should never jump by this much at once
@@ -579,6 +588,7 @@ class ConnWrapper :
         #end if
         self.conn = conn
         self.loop = loop
+        self.user_data = qahirah.UserDataDict()
         self._conn_fd = conn.get_file_descriptor()
           # keep my own copy because conn.get_file_descriptor()
           # could return an error later
@@ -1087,6 +1097,7 @@ class KeyMapping :
         (
             "__weakref__",
             "_code_syms",
+            "user_data", # dict, initially empty, may be used by caller for any purpose
             "mode_switch_mod",
             "numlock_mod",
             "lock_is_shift_lock",
@@ -1115,6 +1126,7 @@ class KeyMapping :
             #end if
         #end for
         self._code_syms = code_syms
+        self.user_data = qahirah.UserDataDict()
         self.mode_switch_mod = None
         self.numlock_mod = STATE.MOD2
         self.lock_is_shift_lock = False
@@ -1198,9 +1210,18 @@ class WindowWrapper :
     "convenience wrapper object around a specific X11 window, with" \
     " appropriately-filtered event dispatching."
 
-    __slots__ = ("__weakref__", "window", "conn", "loop", "_event_filters") # to forestall typos
+    __slots__ = \
+        (
+            "__weakref__",
+            "window",
+            "conn",
+            "loop",
+            "user_data", # dict, initially empty, may be used by caller for any purpose
+            "_event_filters",
+        ) # to forestall typos
 
     _instances = WeakValueDictionary()
+    _ud_refs = WeakValueDictionary()
 
     def __new__(celf, conn, window) :
         self = celf._instances.get(window)
@@ -1208,6 +1229,12 @@ class WindowWrapper :
             self = super().__new__(celf)
             self.conn = conn
             self.window = window
+            user_data = celf._ud_refs.get(window)
+            if user_data == None :
+                user_data = UserDataDict()
+                celf._ud_refs[window] = user_data
+            #end if
+            self.user_data = user_data
             self._event_filters = []
             self.loop = conn.loop
             celf._instances[window] = self
