@@ -596,6 +596,22 @@ class ConnWrapper :
         self.last_sequence = None
     #end __init__
 
+    @classmethod
+    def open(celf, loop = None) :
+        "opens an xcffib.Connection and returns a ConnWrapper for it."
+        conn = xcffib.Connection()
+        return \
+            celf(conn, loop)
+    #end open
+
+    def close(self) :
+        if self.conn != None :
+            self.conn.disconnect()
+            self._conn_fd = None
+            self.conn = None
+        #end if
+    #end close
+
     @staticmethod
     def _handle_conn_readable(w_self) :
         # common fd-readable callback for monitoring server connection
