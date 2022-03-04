@@ -956,9 +956,17 @@ class ConnWrapper :
 class AtomCache :
     "two-way mapping between atom IDs and corresponding name strings, with" \
     " caching to reduce communication with X server."
-    # FIXME: guard against concurrent async calls
 
-    __slots__ = ("__weakref__", "conn", "name_to_atom", "atom_to_name") # to forestall typos
+    __slots__ = \
+        (
+            "__weakref__",
+            "conn",
+            "name_to_atom",
+            "atom_to_name",
+            # following are to guard against concurrent calls for same name/atom
+            "_intern_await",
+            "_getname_await",
+        ) # to forestall typos
 
     def __init__(self, conn) :
         if not isinstance(conn, ConnWrapper) :
@@ -967,6 +975,8 @@ class AtomCache :
         self.conn = conn
         self.name_to_atom = {}
         self.atom_to_name = {}
+        self._intern_await = {}
+        self._getname_await = {}
     #end __init__
 
     def __repr__(self) :
@@ -1017,7 +1027,13 @@ class AtomCache :
         #end if
         if name in self.name_to_atom :
             result = self.name_to_atom[name]
+        elif name in self._intern_await :
+            waitfor = self.loop.create_future()
+            self._intern_await[name].append(waitfor)
+            await waitfor
+            result = self.name_to_atom[name]
         else :
+            self._intern_await[name] = []
             res = self.conn.conn.core.InternAtom \
               (
                 only_if_exists = not create_if,
@@ -1033,6 +1049,11 @@ class AtomCache :
             else :
                 result = None
             #end if
+            waiting = self._intern_await[name]
+            del self._intern_await[name]
+            for waiter in waiting :
+                waiter.set_result(None)
+            #end for
         #end if
         return \
             result
@@ -1065,13 +1086,24 @@ class AtomCache :
         #end if
         if atom in self.atom_to_name :
             result = self.atom_to_name[atom]
+        elif atom in self._getname_await :
+            waitfor = self.loop.create_future()
+            self._getname_await[atom].append(waitfor)
+            await waitfor
+            result = self.atom_to_name[atom]
         else :
+            self._getname_await[atom] = []
             res = self.conn.conn.core.GetAtomName(atom)
             self.conn.conn.flush()
             reply = await self.conn.wait_for_reply(res)
             result = b"".join(reply.name)
             self.name_to_atom[result] = atom
             self.atom_to_name[atom] = result
+            waiting = self._getname_await[atom]
+            del self._getname_await[atom]
+            for waiter in waiting :
+                waiter.set_result(None)
+            #end for
         #end if
         if decode :
             result = result.decode()
