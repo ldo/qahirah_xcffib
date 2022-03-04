@@ -629,7 +629,7 @@ class ConnWrapper :
         if len(self._event_filters) != 0 :
             try :
                 event = self.conn.poll_for_event()
-            except xcffib.ConnectionException :
+            except xcffib.XcffibException :
                 event = None
             #end try
             had_event = event != None
