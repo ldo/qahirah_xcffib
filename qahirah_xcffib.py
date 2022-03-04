@@ -395,7 +395,7 @@ class STATE(enum.IntEnum) :
 # Needed Cairo interface types
 #-
 
-def def_xcffib_subclass(base_class, xcffib_module, xcffib_name, substructs = None) :
+def def_xcffib_subclass(base_class, xcffib_name, substructs = None) :
     # defines a subclass of base_class that adds an ensure_struct
     # method for converting from the xcffib wrapper objects.
 
@@ -450,25 +450,21 @@ def def_xcffib_subclass(base_class, xcffib_module, xcffib_name, substructs = Non
 XCBVisualType = def_xcffib_subclass \
   (
     base_class = qahirah.XCBVisualType,
-    xcffib_module = xproto,
     xcffib_name = "VISUALTYPE"
   )
 XCBRenderDirectFormat = def_xcffib_subclass \
   (
     base_class = qahirah.XCBRenderDirectFormat,
-    xcffib_module = xproto,
     xcffib_name = "DIRECTFORMAT"
   )
 XCBScreen = def_xcffib_subclass \
   (
     base_class = qahirah.XCBScreen,
-    xcffib_module = xproto,
     xcffib_name = "SCREEN"
   )
 XCBRenderPictFormInfo = def_xcffib_subclass \
   (
     base_class = qahirah.XCBRenderPictFormInfo,
-    xcffib_module = xrender,
     xcffib_name = "PICTFORMINFO",
     substructs = {"direct" : XCBRenderDirectFormat}
   )
