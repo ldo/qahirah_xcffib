@@ -972,9 +972,9 @@ class AtomCache :
               )
     #end __repr__
 
-    def intern_atom(self, name, only_if_exists) :
+    def intern_atom(self, name, create_if = True) :
         "maps a name string to an atom ID, creating a new mapping unless" \
-        " only_if_exists. Returns None if there is no such mapping."
+        " not create_if. Returns None if there is no such mapping."
         if isinstance(name, str) :
             name = name.encode()
         elif not isinstance(name, (bytes, bytearray)) :
@@ -985,7 +985,7 @@ class AtomCache :
         else :
             res = self.conn.conn.core.InternAtom \
               (
-                only_if_exists = only_if_exists,
+                only_if_exists = not create_if,
                 name_len = len(name),
                 name = name
               )
