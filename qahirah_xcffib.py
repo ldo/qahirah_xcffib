@@ -949,8 +949,8 @@ class ConnWrapper :
 
 class AtomCache :
     "two-way mapping between atom IDs and corresponding name strings, with" \
-    " caching to reduce communication with X server. Note I don’t provide" \
-    " async versions of the lookup calls as yet, as they seem to block forever."
+    " caching to reduce communication with X server."
+    # FIXME: guard against concurrent async calls
 
     __slots__ = ("__weakref__", "conn", "name_to_atom", "atom_to_name") # to forestall typos
 
@@ -1001,6 +1001,37 @@ class AtomCache :
             result
     #end intern_atom
 
+    async def intern_atom_async(self, name, create_if = True) :
+        "maps a name string to an atom ID, creating a new mapping unless" \
+        " not create_if. Returns None if there is no such mapping."
+        if isinstance(name, str) :
+            name = name.encode()
+        elif not isinstance(name, (bytes, bytearray)) :
+            raise TypeError("name must be str or bytes")
+        #end if
+        if name in self.name_to_atom :
+            result = self.name_to_atom[name]
+        else :
+            res = self.conn.conn.core.InternAtom \
+              (
+                only_if_exists = not create_if,
+                name_len = len(name),
+                name = name
+              )
+            self.conn.conn.flush()
+            reply = await self.conn.wait_for_reply(res)
+            result = reply.atom
+            if result != 0 :
+                self.name_to_atom[name] = result
+                self.atom_to_name[result] = name
+            else :
+                result = None
+            #end if
+        #end if
+        return \
+            result
+    #end intern_atom_async
+
     def get_atom_name(self, atom : int, decode = True) :
         "maps an atom ID to a name string. The atom must have already been defined."
         if not isinstance(atom, int) :
@@ -1020,6 +1051,28 @@ class AtomCache :
         return \
             result
     #end get_atom_name
+
+    async def get_atom_name_async(self, atom : int, decode = True) :
+        "maps an atom ID to a name string. The atom must have already been defined."
+        if not isinstance(atom, int) :
+            raise TypeError("atom must be an int")
+        #end if
+        if atom in self.atom_to_name :
+            result = self.atom_to_name[atom]
+        else :
+            res = self.conn.conn.core.GetAtomName(atom)
+            self.conn.conn.flush()
+            reply = await self.conn.wait_for_reply(res)
+            result = b"".join(reply.name)
+            self.name_to_atom[result] = atom
+            self.atom_to_name[atom] = result
+        #end if
+        if decode :
+            result = result.decode()
+        #end if
+        return \
+            result
+    #end get_atom_name_async
 
     def flush(self) :
         "invalidates all cache entries."
