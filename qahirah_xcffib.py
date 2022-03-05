@@ -683,7 +683,7 @@ class ConnWrapper :
 
     def add_event_filter(self, action, arg) :
         "installs a filter which gets to see all incoming events. It is invoked" \
-        " as “action(event, arg) where the meaning of arg is up to you”."
+        " as “action(event, arg)“ where the meaning of arg is up to you."
         if (
             any
               (
@@ -696,6 +696,7 @@ class ConnWrapper :
         #end if
         newelt = (action, arg)
         if len(self._event_filters) + len(self._reply_queue) == 0 :
+            print("add_event_filter: add_reader") # debug
             self.loop.add_reader \
               (
                 self._conn_fd,
@@ -800,6 +801,7 @@ class ConnWrapper :
         else :
             newelt = (reply_ready_action, result)
             if len(self._event_filters) + len(self._reply_queue) == 0 :
+                print("wait_for_reply: add_reader") # debug
                 self.loop.add_reader \
                   (
                     self._conn_fd,
@@ -963,9 +965,10 @@ class AtomCache :
             "conn",
             "name_to_atom",
             "atom_to_name",
-            "_lookup_await",
-            "_lookup_current",
-            "_wakeup_current",
+            "_lookup_process",
+            "_lookup_queue",
+            "_name_lookup_pending",
+            "_atom_lookup_pending",
         ) # to forestall typos
 
     def __init__(self, conn) :
@@ -975,9 +978,10 @@ class AtomCache :
         self.conn = conn
         self.name_to_atom = {}
         self.atom_to_name = {}
-        self._lookup_await = []
-        self._lookup_current = None
-        self._wakeup_current = None
+        self._lookup_process = None
+        self._lookup_queue = []
+        self._name_lookup_pending = {}
+        self._atom_lookup_pending = {}
     #end __init__
 
     def __repr__(self) :
@@ -988,6 +992,26 @@ class AtomCache :
                 for k in self.name_to_atom
               )
     #end __repr__
+
+    @staticmethod
+    async def _process_queue(w_self) :
+        self = w_self()
+        assert self != None, "parent ConnWrapper has gone away"
+        print("AtomCache._process_queue starting up") # debug
+        while True :
+            try :
+                entry = self._lookup_queue.pop(0)
+            except IndexError :
+                break
+            #end try
+            print("AtomCache._process_queue awaiting %s" % repr(entry)) # debug
+            await entry
+            print("AtomCache._process_queue entry %s done" % repr(entry)) # debug
+        #end while
+        print("AtomCache._process_queue shutting down") # debug
+        self._lookup_process = None
+        # and terminate
+    #end _process_queue
 
     def intern_atom(self, name, create_if = True) :
         "maps a name string to an atom ID, creating a new mapping unless" \
@@ -1028,61 +1052,46 @@ class AtomCache :
         #end if
         if name in self.name_to_atom :
             result = self.name_to_atom[name]
+            print("intern_atom_async found in %s in cache => %d" % (repr(name), result)) # debug
+        elif name in self._name_lookup_pending :
+            print("intern_atom_async lookup for %s already in progress" % repr(name)) # debug
+            result = await self._name_lookup_pending[name]
         else :
-            if self._lookup_current != None :
-                # ask them to wake me up when they’re done
-                awaiting = self.conn.loop.create_future()
-                self._lookup_await.append(awaiting)
-                await awaiting
-                self._lookup_await.remove(awaiting)
-            #end if
-            assert self._lookup_current == None
-            res = self.conn.conn.core.InternAtom \
-              (
-                only_if_exists = not create_if,
-                name_len = len(name),
-                name = name
-              )
-            self.conn.conn.flush()
-            awaiting = self.conn.wait_for_reply(res)
-            self._lookup_current = awaiting
-            reply = await awaiting
-            assert self._lookup_current == awaiting
-            self._lookup_current = None
-            result = reply.atom
-            if result != 0 :
-                self.name_to_atom[name] = result
-                self.atom_to_name[result] = name
-            else :
-                result = None
-            #end if
-            if self._wakeup_current != None :
-                # return the favour to whomever woke me up
-                if not self._wakeup_current.done() :
-                    self._wakeup_current.set_result(None)
+            async def do_lookup(w_self, lookup_done) :
+                self = w_self()
+                assert self != None, "parent ConnWrapper has gone away"
+                print("intern_atom_async: about to lookup %s" % repr(name)) # debug
+                res = self.conn.conn.core.InternAtom \
+                  (
+                    only_if_exists = not create_if,
+                    name_len = len(name),
+                    name = name
+                  )
+                self.conn.conn.flush()
+                reply = await self.conn.wait_for_reply(res)
+                result = reply.atom
+                print("intern_atom_async: looked up %s, got %d" % (repr(name), result)) # debug
+                if result != 0 :
+                    self.name_to_atom[name] = result
+                    self.atom_to_name[result] = name
+                else :
+                    result = None
                 #end if
-            else :
-                # wake up anybody who might have been waiting for me to finish
-                waiters = self._lookup_await[:]
-                awaiting = None
-                for waiter in waiters :
-                    if not waiter.done() :
-                        waiter.set_result(None)
-                        # but this is not enough to actually let them run,
-                        # which is why I need the _wakeup_current handshake (below)
-                        if awaiting == None :
-                            awaiting = self.conn.loop.create_future()
-                        #end if
-                    #end if
-                #end for
-                if awaiting != None :
-                    # need to give a chance for somebody I just woke up to run
-                    self._wakeup_current = awaiting
-                    await awaiting
-                    assert self._wakeup_current == awaiting
-                    self._wakeup_current = None
-                #end if
+                lookup_done.set_result(result)
+            #end do_lookup
+
+            lookup_done = self.conn.loop.create_future()
+            self._lookup_queue.append(do_lookup(weak_ref(self), lookup_done))
+            self._name_lookup_pending[name] = lookup_done
+            if self._lookup_process == None :
+                self._lookup_process = self.conn.loop.create_task \
+                  (
+                    self._process_queue(weak_ref(self))
+                  )
             #end if
+            result = await lookup_done
+            assert self._name_lookup_pending[name] == lookup_done
+            del self._name_lookup_pending[name]
         #end if
         return \
             result
@@ -1115,53 +1124,33 @@ class AtomCache :
         #end if
         if atom in self.atom_to_name :
             result = self.atom_to_name[atom]
+        elif atom in self._atom_lookup_pending :
+            result = await self._atom_lookup_pending[atom]
         else :
-            if self._lookup_current != None :
-                # ask them to wake me up when they’re done
-                awaiting = self.conn.loop.create_future()
-                self._lookup_await.append(awaiting)
-                await awaiting
-                self._lookup_await.remove(awaiting)
+            async def do_lookup(w_self, lookup_done) :
+                self = w_self()
+                assert self != None, "parent ConnWrapper has gone away"
+                res = self.conn.conn.core.GetAtomName(atom)
+                self.conn.conn.flush()
+                reply = await self.conn.wait_for_reply(res)
+                result = b"".join(reply.name)
+                self.name_to_atom[result] = atom
+                self.atom_to_name[atom] = result
+                lookup_done.set_result(result)
+            #end do_lookup
+
+            lookup_done = self.conn.loop.create_future()
+            self._lookup_queue.append(do_lookup(weak_ref(self), lookup_done))
+            self._atom_lookup_pending[atom] = lookup_done
+            if self._lookup_process == None :
+                self._lookup_process = self.conn.loop.create_task \
+                  (
+                    self._process_queue(weak_ref(self))
+                  )
             #end if
-            assert self._lookup_current == None
-            res = self.conn.conn.core.GetAtomName(atom)
-            self.conn.conn.flush()
-            reply = await self.conn.wait_for_reply(res)
-            awaiting = self.conn.wait_for_reply(res)
-            self._lookup_current = awaiting
-            reply = await awaiting
-            assert self._lookup_current == awaiting
-            self._lookup_current = None
-            result = b"".join(reply.name)
-            self.name_to_atom[result] = atom
-            self.atom_to_name[atom] = result
-            if self._wakeup_current != None :
-                # return the favour to whomever woke me up
-                if not self._wakeup_current.done() :
-                    self._wakeup_current.set_result(None)
-                #end if
-            else :
-                # wake up anybody who might have been waiting for me to finish
-                waiters = self._lookup_await[:]
-                awaiting = None
-                for waiter in waiters :
-                    if not waiter.done() :
-                        waiter.set_result(None)
-                        # but this is not enough to actually let them run,
-                        # which is why I need the _wakeup_current handshake (below)
-                        if awaiting == None :
-                            awaiting = self.conn.loop.create_future()
-                        #end if
-                    #end if
-                #end for
-                if awaiting != None :
-                    # need to give a chance for somebody I just woke up to run
-                    self._wakeup_current = awaiting
-                    await awaiting
-                    assert self._wakeup_current == awaiting
-                    self._wakeup_current = None
-                #end if
-            #end if
+            result = await lookup_done
+            assert self._atom_lookup_pending[atom] == lookup_done
+            del self._atom_lookup_pending[atom]
         #end if
         if decode :
             result = result.decode()
