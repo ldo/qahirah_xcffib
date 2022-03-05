@@ -696,7 +696,6 @@ class ConnWrapper :
         #end if
         newelt = (action, arg)
         if len(self._event_filters) + len(self._reply_queue) == 0 :
-            print("add_event_filter: add_reader") # debug
             self.loop.add_reader \
               (
                 self._conn_fd,
@@ -801,7 +800,6 @@ class ConnWrapper :
         else :
             newelt = (reply_ready_action, result)
             if len(self._event_filters) + len(self._reply_queue) == 0 :
-                print("wait_for_reply: add_reader") # debug
                 self.loop.add_reader \
                   (
                     self._conn_fd,
@@ -997,18 +995,14 @@ class AtomCache :
     async def _process_queue(w_self) :
         self = w_self()
         assert self != None, "parent ConnWrapper has gone away"
-        print("AtomCache._process_queue starting up") # debug
         while True :
             try :
                 entry = self._lookup_queue.pop(0)
             except IndexError :
                 break
             #end try
-            print("AtomCache._process_queue awaiting %s" % repr(entry)) # debug
             await entry
-            print("AtomCache._process_queue entry %s done" % repr(entry)) # debug
         #end while
-        print("AtomCache._process_queue shutting down") # debug
         self._lookup_process = None
         # and terminate
     #end _process_queue
@@ -1052,15 +1046,12 @@ class AtomCache :
         #end if
         if name in self.name_to_atom :
             result = self.name_to_atom[name]
-            print("intern_atom_async found in %s in cache => %d" % (repr(name), result)) # debug
         elif name in self._name_lookup_pending :
-            print("intern_atom_async lookup for %s already in progress" % repr(name)) # debug
             result = await self._name_lookup_pending[name]
         else :
             async def do_lookup(w_self, lookup_done) :
                 self = w_self()
                 assert self != None, "parent ConnWrapper has gone away"
-                print("intern_atom_async: about to lookup %s" % repr(name)) # debug
                 res = self.conn.conn.core.InternAtom \
                   (
                     only_if_exists = not create_if,
@@ -1070,7 +1061,6 @@ class AtomCache :
                 self.conn.conn.flush()
                 reply = await self.conn.wait_for_reply(res)
                 result = reply.atom
-                print("intern_atom_async: looked up %s, got %d" % (repr(name), result)) # debug
                 if result != 0 :
                     self.name_to_atom[name] = result
                     self.atom_to_name[result] = name
