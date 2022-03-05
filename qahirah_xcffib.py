@@ -1050,18 +1050,20 @@ class AtomCache :
             "_atom_lookup_pending",
         ) # to forestall typos
 
-    def __init__(self, conn) :
+    def __init__(self, conn, preload_standard = True) :
         if not isinstance(conn, ConnWrapper) :
             raise TypeError("conn must be a ConnWrapper")
         #end if
         self.conn = conn
         self.name_to_atom = {}
         self.atom_to_name = {}
-        for key, value in XA_NAME.items() :
-            # preload predefined atoms
-            self.name_to_atom[key] = value
-            self.atom_to_name[value] = key
-        #end for
+        if preload_standard :
+            for key, value in XA_NAME.items() :
+                # preload standard atoms
+                self.name_to_atom[key] = value
+                self.atom_to_name[value] = key
+            #end for
+        #end if
         self._lookup_process = None
         self._lookup_queue = []
         self._name_lookup_pending = {}
