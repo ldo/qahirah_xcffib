@@ -1044,11 +1044,22 @@ class AtomCache :
             "conn",
             "name_to_atom",
             "atom_to_name",
+            "preload_standard",
             "_lookup_process",
             "_lookup_queue",
             "_name_lookup_pending",
             "_atom_lookup_pending",
         ) # to forestall typos
+
+    def _do_preload_standard(self) :
+        # preload standard atoms if specified
+        if self.preload_standard :
+            for key, value in XA_NAME.items() :
+                self.name_to_atom[key] = value
+                self.atom_to_name[value] = key
+            #end for
+        #end if
+    #end _do_preload_standard
 
     def __init__(self, conn, preload_standard = True) :
         if not isinstance(conn, ConnWrapper) :
@@ -1057,17 +1068,12 @@ class AtomCache :
         self.conn = conn
         self.name_to_atom = {}
         self.atom_to_name = {}
-        if preload_standard :
-            for key, value in XA_NAME.items() :
-                # preload standard atoms
-                self.name_to_atom[key] = value
-                self.atom_to_name[value] = key
-            #end for
-        #end if
+        self.preload_standard = preload_standard
         self._lookup_process = None
         self._lookup_queue = []
         self._name_lookup_pending = {}
         self._atom_lookup_pending = {}
+        self._do_preload_standard()
     #end __init__
 
     def __repr__(self) :
@@ -1241,6 +1247,7 @@ class AtomCache :
         "invalidates all cache entries."
         self.name_to_atom.clear()
         self.atom_to_name.clear()
+        self._do_preload_standard()
     #end flush
 
 #end AtomCache
