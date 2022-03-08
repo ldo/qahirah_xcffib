@@ -29,6 +29,13 @@ from xcffib import \
 # Useful stuff
 #-
 
+def _wderef(wself, parent) :
+    self = wself()
+    assert self != None, "parent %s has gone away" % parent
+    return \
+        self
+#end _wderef
+
 if hasattr(asyncio, "get_running_loop") :
     # new in Python 3.7
     get_running_loop = asyncio.get_running_loop
@@ -703,8 +710,7 @@ class ConnWrapper :
     def _handle_conn_readable(w_self) :
         # common fd-readable callback for monitoring server connection
         # for input.
-        self = w_self()
-        assert self != None, "parent ConnWrapper has gone away"
+        self = _wderef(w_self, "ConnWrapper")
 
         had_event = False
         if len(self._event_filters) != 0 :
@@ -817,8 +823,7 @@ class ConnWrapper :
         result = self.loop.create_future()
 
         def event_ready_action(event, result) :
-            self = w_self()
-            assert self != None, "parent ConnWrapper has gone away"
+            self = _wderef(w_self, "ConnWrapper")
             self.remove_event_filter(event_ready_action, result, optional = False)
             if isinstance(event, Exception) :
                 result.set_exception(event)
@@ -1087,8 +1092,7 @@ class AtomCache :
 
     @staticmethod
     async def _process_queue(w_self) :
-        self = w_self()
-        assert self != None, "parent ConnWrapper has gone away"
+        self = _wderef(w_self, "ConnWrapper")
         while True :
             try :
                 entry = self._lookup_queue.pop(0)
@@ -1144,8 +1148,7 @@ class AtomCache :
             result = await self._name_lookup_pending[name]
         else :
             async def do_lookup(w_self, lookup_done) :
-                self = w_self()
-                assert self != None, "parent ConnWrapper has gone away"
+                self = _wderef(w_self, "ConnWrapper")
                 res = self.conn.conn.core.InternAtom \
                   (
                     only_if_exists = not create_if,
@@ -1212,8 +1215,7 @@ class AtomCache :
             result = await self._atom_lookup_pending[atom]
         else :
             async def do_lookup(w_self, lookup_done) :
-                self = w_self()
-                assert self != None, "parent ConnWrapper has gone away"
+                self = _wderef(w_self, "ConnWrapper")
                 res = self.conn.conn.core.GetAtomName(atom)
                 self.conn.conn.flush()
                 reply = await self.conn.wait_for_reply(res)
@@ -1426,8 +1428,7 @@ class WindowWrapper :
 
     @staticmethod
     def _conn_event_filter(event, w_self) :
-        self = w_self()
-        assert self != None, "parent WindowWrapper has gone away"
+        self = _wderef(w_self, "WindowWrapper")
         if isinstance(event, Exception) or event.window == self.window :
             event_filters = self._event_filters[:]
               # copy in case actions make changes
