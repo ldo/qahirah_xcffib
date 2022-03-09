@@ -870,6 +870,7 @@ class Connection :
             "__weakref__",
             "conn",
             "loop",
+            "atom_cache",
             "user_data",
             "_conn_fd",
             "_event_filters",
@@ -887,6 +888,7 @@ class Connection :
         #end if
         self.conn = conn
         self.loop = loop
+        self.atom_cache = AtomCache(self)
         self.user_data = qahirah.UserDataDict()
         self._conn_fd = conn.get_file_descriptor()
           # keep my own copy because conn.get_file_descriptor()
