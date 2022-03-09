@@ -823,6 +823,9 @@ class GC_BIT(enum.IntEnum) :
 #end GC_BIT
 
 class Connection :
+    "wraps an XCB connection to the X server. You can instantiate directly," \
+    " passing the result from xcffib.Connection(), or you can use the open()" \
+    " method."
 
     __slots__ = \
         (
@@ -1208,7 +1211,10 @@ class Connection :
 
 class AtomCache :
     "two-way mapping between atom IDs and corresponding name strings, with" \
-    " caching to reduce communication with X server."
+    " caching to reduce communication with the X server. Instantiate with a" \
+    " Connection object which will be used to communicate with the server." \
+    " Both synchronous and asynchronous versions of intern_atom and" \
+    " get_atom_name calls are provided."
 
     __slots__ = \
         (
@@ -1467,6 +1473,8 @@ class KeyMapping :
 
     @classmethod
     def obtain_from(celf, conn : Connection) :
+        "queries the specified X server connection for its current key mapping" \
+        " and returns a KeyMapping object based on that."
         if not isinstance(conn, Connection) :
             raise TypeError("conn must be a Connection")
         #end if
@@ -1478,6 +1486,8 @@ class KeyMapping :
 
     @classmethod
     async def obtain_from_async(celf, conn : Connection) :
+        "queries the specified X server connection for its current key mapping" \
+        " and returns a KeyMapping object based on that."
         if not isinstance(conn, Connection) :
             raise TypeError("conn must be a Connection")
         #end if
@@ -1491,7 +1501,7 @@ class KeyMapping :
 
     def map_simple(self, evt : xproto.KeyPressEvent) :
         "maps a given key-press event to an appropriate keysym according" \
-        " to the rules in the core X11 spec."
+        " to the rules in the core X11 spec as applied to this mapping."
         if not isinstance(evt, xproto.KeyPressEvent) :
             raise TypeError("evt is not a KeyPressEvent")
         #end if
@@ -1567,7 +1577,8 @@ class Pixmap :
 
 class Window :
     "convenience wrapper object around a specific X11 window, with" \
-    " appropriately-filtered event dispatching."
+    " appropriately-filtered event dispatching. Do not instantiate" \
+    " directly; get from the easy_create() or easy_create_async() methods."
 
     __slots__ = \
         (
@@ -1744,6 +1755,7 @@ class Window :
     #end easy_create_surface
 
     def _easy_create_pixmap(self, dimensions : qahirah.Vector, use_xrender : bool) :
+        # common code for both easy_create_pixmap and easy_create_pixmap_async.
         pixmap_id = self.conn.conn.generate_id()
         dimensions = qahirah.Vector.from_tuple(dimensions)
         res = self.conn.conn.core.CreatePixmap \
@@ -1776,6 +1788,7 @@ class Window :
     #end easy_create_pixmap
 
     def clear_area(self, bounds : qahirah.Rect, exposures : bool) :
+        "does a ClearArea call on the specified area of the window."
         res = self.conn.ClearArea(exposures, bounds.x, bounds.y, bounds.width, bounds.height)
         self.conn.request_check(res.sequence)
     #end clear_area
@@ -1788,6 +1801,8 @@ class Window :
         dst_pos : qahirah.Vector,
         dimensions : qahirah.Vector
       ) :
+        "does a CopyArea call from the specified part of the source" \
+        " Pixmap to the specified position within the window."
         if not isinstance(src, Pixmap) :
             raise TypeError("src must be a Pixmap")
         #end if
