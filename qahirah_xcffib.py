@@ -652,6 +652,41 @@ class CW_BIT(enum.IntEnum) :
 #end CW_BIT
 CW_BIT.COLORMAP = CW_BIT.COLOURMAP # if you prefer
 
+class GC_BIT(enum.IntEnum) :
+    "bit numbers corresponding to bit masks for GC attributes to" \
+    " create_gc calls. Not actually supported for now."
+    # Note: must be specified in strictly increasing order
+    FUNCTION = 0
+    PLANEMASK = 1
+    FOREGROUND = 2
+    BACKGROUND = 3
+    LINEWIDTH = 4
+    LINESTYLE = 5
+    CAPSTYLE = 6
+    JOINSTYLE = 7
+    FILLSTYLE = 8
+    FILLRULE = 9
+    TILE = 10
+    STIPPLE = 11
+    TILESTIPXORIGIN = 12
+    TILESTIPYORIGIN = 13
+    FONT = 14
+    SUBWINDOWMODE = 15
+    GRAPHICSEXPOSURES = 16
+    CLIPXORIGIN = 17
+    CLIPYORIGIN = 18
+    CLIPMASK = 19
+    DASHOFFSET = 20
+    DASHLIST = 21
+    ARCMODE = 22
+
+    @property
+    def mask(self) :
+        return 1 << self.value
+    #end mask
+
+#end GC_BIT
+
 class Connection :
 
     __slots__ = \
@@ -976,14 +1011,11 @@ class Connection :
             window
     #end easy_create_window_async
 
-    def easy_create_surface(self, window, use_xrender : bool) :
+    def easy_create_surface(self, drawable, dimensions, use_xrender : bool) :
         "convenience routine which creates an XCBSurface for drawing" \
-        " with Cairo into the specified window, with the option of" \
-        " using xrender.\n" \
-        "\n" \
-        "Note that the surface is initially created with dummy dimensions;" \
-        " these will need to be fixed up with a set_size() call when you" \
-        " receive a ConfigureNotifyEvent for the window."
+        " with Cairo into the specified drawable, with the option of" \
+        " using xrender."
+        dimensions = qahirah.Vector.from_tuple(dimensions)
         default_screen = self.conn.get_screen_pointers()[0]
         use_root = self.conn.get_setup().roots[0]
         if use_xrender :
@@ -1010,10 +1042,10 @@ class Connection :
               (
                 connection = self.conn,
                 screen = default_screen,
-                drawable = window,
+                drawable = drawable,
                 format = use_pictformats[0],
-                width = 10, # correct these on ConfigureNotifyEvent
-                height = 10
+                width = dimensions.x,
+                height = dimensions.y
               )
         else :
             use_visuals = list \
@@ -1027,10 +1059,10 @@ class Connection :
             surface = XCBSurface.create \
               (
                 connection = self.conn,
-                drawable = window,
+                drawable = drawable,
                 visual = use_visuals[0],
-                width = 10, # correct these on ConfigureNotifyEvent
-                height = 10
+                width = dimensions.x,
+                height = dimensions.y
               )
         #end if
         return \
@@ -1372,6 +1404,32 @@ class KeyMapping :
 
 #end KeyMapping
 
+class Pixmap :
+    "wraps a Pixmap, with an associated surface already created for Cairo drawing." \
+    " Do not instantiate directly; get from Window.easy_create_pixmap()."
+
+    def __init__(self, id, surface, parent) :
+        self.id = id
+        self.surface = surface
+        self.parent = parent
+    #end __init__
+
+    def destroy(self) :
+        if self.id != None :
+            self.surface = None
+            res = self.parent.conn.core.FreePixmap(self.id)
+            self.parent.conn.request_check(res.sequence)
+            self.id = None
+            self.parent = None
+        #end if
+    #end destroy
+
+    def __del__(self) :
+        self.destroy()
+    #end __del__(self)
+
+#end Pixmap
+
 class Window :
     "convenience wrapper object around a specific X11 window, with" \
     " appropriately-filtered event dispatching."
@@ -1382,6 +1440,7 @@ class Window :
             "window",
             "conn",
             "loop",
+            "gc",
             "user_data", # dict, initially empty, may be used by caller for any purpose
             "_event_filters",
         ) # to forestall typos
@@ -1403,6 +1462,12 @@ class Window :
             self.user_data = user_data
             self._event_filters = []
             self.loop = conn.loop
+            self.gc = self.conn.conn.generate_id()
+              # Note that, if window wrapper object was lost but window ID
+              # is still valid on server, then a new GC will be created
+              # to go with the new window wrapper object. C’est la vie.
+            res = self.conn.conn.core.CreateGC(self.gc, self.window, 0, [])
+            self.conn.conn.request_check(res.sequence)
             celf._instances[window] = self
             self.conn.add_event_filter(self._conn_event_filter, weak_ref(self))
         #end if
@@ -1540,8 +1605,74 @@ class Window :
         " these will need to be fixed up with a set_size() call when you" \
         " receive a ConfigureNotifyEvent for the window."
         return \
-            self.conn.easy_create_surface(self.window, use_xrender)
+            self.conn.easy_create_surface(self.window, (10, 10), use_xrender)
     #end easy_create_surface
+
+    def _easy_create_pixmap(self, dimensions : qahirah.Vector, use_xrender : bool) :
+        pixmap_id = self.conn.conn.generate_id()
+        dimensions = qahirah.Vector.from_tuple(dimensions)
+        res = self.conn.conn.core.CreatePixmap \
+          (
+            pid = pixmap_id,
+            drawable = self.window,
+            depth = 24, # does 32 work?
+            width = dimensions.x,
+            height = dimensions.y
+          )
+        return \
+            pixmap_id, res
+    #end _easy_create_pixmap
+
+    def easy_create_pixmap(self, dimensions : qahirah.Vector, use_xrender : bool) :
+        pixmap_id, res = self._easy_create_pixmap(dimensions, use_xrender)
+        self.conn.conn.request_check(res.sequence)
+        surface = self.conn.easy_create_surface(pixmap_id, dimensions, use_xrender)
+        return \
+            Pixmap(pixmap_id, surface, self)
+    #end easy_create_pixmap
+
+    async def easy_create_pixmap_async(self, dimensions : qahirah.Vector, use_xrender : bool) :
+        # should I bother with async version, given no actual reply is returned from server?
+        pixmap_id, res = self._easy_create_pixmap(dimensions, use_xrender)
+        await self.wait_for_reply(res)
+        surface = self.conn.easy_create_surface(pixmap_id, dimensions, use_xrender)
+        return \
+            Pixmap(pixmap_id, surface, self)
+    #end easy_create_pixmap
+
+    def clear_area(self, bounds : qahirah.Rect, exposures : bool) :
+        res = self.conn.ClearArea(exposures, bounds.x, bounds.y, bounds.width, bounds.height)
+        self.conn.request_check(res.sequence)
+    #end clear_area
+
+    def copy_pix_area \
+      (
+        self,
+        src : Pixmap,
+        src_pos : qahirah.Vector,
+        dst_pos : qahirah.Vector,
+        dimensions : qahirah.Vector
+      ) :
+        if not isinstance(src, Pixmap) :
+            raise TypeError("src must be a Pixmap")
+        #end if
+        src_pos = qahirah.Vector.from_tuple(src_pos)
+        dst_pos = qahirah.Vector.from_tuple(dst_pos)
+        dimensions = qahirah.Vector.from_tuple(dimensions)
+        res = self.conn.CopyArea \
+          (
+            src_drawable = src.id,
+            dst_drawable = self.window,
+            gc = self.gc,
+            src_x = src_pos.x,
+            src_y = src_pos.y,
+            dst_x = dst_pos.x,
+            dst_y = dst_pos.y,
+            width = dimensions.x,
+            height = dimensions.y
+          )
+        self.conn.request_check(res.sequence)
+    #end copy_pix_area
 
 #end Window
 
@@ -1551,7 +1682,7 @@ class Window :
 
 def _atexit() :
     # disable all __del__ methods at process termination to avoid segfaults
-    for cłass in (Window,) :
+    for cłass in (Window, Pixmap) :
         delattr(cłass, "__del__")
     #end for
 #end _atexit
