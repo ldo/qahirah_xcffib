@@ -652,7 +652,7 @@ class CW_BIT(enum.IntEnum) :
 #end CW_BIT
 CW_BIT.COLORMAP = CW_BIT.COLOURMAP # if you prefer
 
-class ConnWrapper :
+class Connection :
 
     __slots__ = \
         (
@@ -692,7 +692,7 @@ class ConnWrapper :
 
     @classmethod
     def open(celf, loop = None) :
-        "opens an xcffib.Connection and returns a ConnWrapper for it."
+        "opens an xcffib.Connection and returns a Connection for it."
         conn = xcffib.Connection()
         return \
             celf(conn, loop)
@@ -710,7 +710,7 @@ class ConnWrapper :
     def _handle_conn_readable(w_self) :
         # common fd-readable callback for monitoring server connection
         # for input.
-        self = _wderef(w_self, "ConnWrapper")
+        self = _wderef(w_self, "Connection")
 
         had_event = False
         if len(self._event_filters) != 0 :
@@ -823,7 +823,7 @@ class ConnWrapper :
         result = self.loop.create_future()
 
         def event_ready_action(event, result) :
-            self = _wderef(w_self, "ConnWrapper")
+            self = _wderef(w_self, "Connection")
             self.remove_event_filter(event_ready_action, result, optional = False)
             if isinstance(event, Exception) :
                 result.set_exception(event)
@@ -1037,7 +1037,7 @@ class ConnWrapper :
             surface
     #end easy_create_surface
 
-#end ConnWrapper
+#end Connection
 
 class AtomCache :
     "two-way mapping between atom IDs and corresponding name strings, with" \
@@ -1067,8 +1067,8 @@ class AtomCache :
     #end _do_preload_standard
 
     def __init__(self, conn, preload_standard = True) :
-        if not isinstance(conn, ConnWrapper) :
-            raise TypeError("conn must be a ConnWrapper")
+        if not isinstance(conn, Connection) :
+            raise TypeError("conn must be a Connection")
         #end if
         self.conn = conn
         self.name_to_atom = {}
@@ -1092,7 +1092,7 @@ class AtomCache :
 
     @staticmethod
     async def _process_queue(w_self) :
-        self = _wderef(w_self, "ConnWrapper")
+        self = _wderef(w_self, "Connection")
         while True :
             try :
                 entry = self._lookup_queue.pop(0)
@@ -1148,7 +1148,7 @@ class AtomCache :
             result = await self._name_lookup_pending[name]
         else :
             async def do_lookup(w_self, lookup_done) :
-                self = _wderef(w_self, "ConnWrapper")
+                self = _wderef(w_self, "Connection")
                 res = self.conn.conn.core.InternAtom \
                   (
                     only_if_exists = not create_if,
@@ -1215,7 +1215,7 @@ class AtomCache :
             result = await self._atom_lookup_pending[atom]
         else :
             async def do_lookup(w_self, lookup_done) :
-                self = _wderef(w_self, "ConnWrapper")
+                self = _wderef(w_self, "Connection")
                 res = self.conn.conn.core.GetAtomName(atom)
                 self.conn.conn.flush()
                 reply = await self.conn.wait_for_reply(res)
@@ -1299,9 +1299,9 @@ class KeyMapping :
     #end __init__
 
     @classmethod
-    def obtain_from(celf, conn : ConnWrapper) :
-        if not isinstance(conn, ConnWrapper) :
-            raise TypeError("conn must be a ConnWrapper")
+    def obtain_from(celf, conn : Connection) :
+        if not isinstance(conn, Connection) :
+            raise TypeError("conn must be a Connection")
         #end if
         res = conn.conn.core.GetKeyboardMapping(KEYCODE_MIN, KEYCODE_MAX - KEYCODE_MIN + 1)
         mapping = res.reply()
@@ -1310,9 +1310,9 @@ class KeyMapping :
     #end obtain_from
 
     @classmethod
-    async def obtain_from_async(celf, conn : ConnWrapper) :
-        if not isinstance(conn, ConnWrapper) :
-            raise TypeError("conn must be a ConnWrapper")
+    async def obtain_from_async(celf, conn : Connection) :
+        if not isinstance(conn, Connection) :
+            raise TypeError("conn must be a Connection")
         #end if
         mapping = await conn.wait_for_reply \
           (
@@ -1372,7 +1372,7 @@ class KeyMapping :
 
 #end KeyMapping
 
-class WindowWrapper :
+class Window :
     "convenience wrapper object around a specific X11 window, with" \
     " appropriately-filtered event dispatching."
 
@@ -1420,7 +1420,7 @@ class WindowWrapper :
 
     @classmethod
     def get_window(celf, window) :
-        "given an X11 window ID, returns the corresponding WindowWrapper object." \
+        "given an X11 window ID, returns the corresponding Window object." \
         " Assumes one already exists!"
         return \
             celf._instances[window]
@@ -1428,7 +1428,7 @@ class WindowWrapper :
 
     @staticmethod
     def _conn_event_filter(event, w_self) :
-        self = _wderef(w_self, "WindowWrapper")
+        self = _wderef(w_self, "Window")
         if isinstance(event, Exception) or event.window == self.window :
             event_filters = self._event_filters[:]
               # copy in case actions make changes
@@ -1480,8 +1480,8 @@ class WindowWrapper :
 
     @classmethod
     def easy_create(celf, conn, bounds : qahirah.Rect, border_width : int, set_attrs) :
-        if not isinstance(conn, ConnWrapper) :
-            raise TypeError("conn must be a ConnWrapper")
+        if not isinstance(conn, Connection) :
+            raise TypeError("conn must be a Connection")
         #end if
         window = conn.easy_create_window(bounds, border_width, set_attrs)
         return \
@@ -1490,8 +1490,8 @@ class WindowWrapper :
 
     @classmethod
     async def easy_create_async(celf, conn, bounds : qahirah.Rect, border_width : int, set_attrs) :
-        if not isinstance(conn, ConnWrapper) :
-            raise TypeError("conn must be a ConnWrapper")
+        if not isinstance(conn, Connection) :
+            raise TypeError("conn must be a Connection")
         #end if
         window = await conn.easy_create_window_async(bounds, border_width, set_attrs)
         return \
@@ -1543,7 +1543,7 @@ class WindowWrapper :
             self.conn.easy_create_surface(self.window, use_xrender)
     #end easy_create_surface
 
-#end WindowWrapper
+#end Window
 
 #+
 # Cleanup
@@ -1551,7 +1551,7 @@ class WindowWrapper :
 
 def _atexit() :
     # disable all __del__ methods at process termination to avoid segfaults
-    for cłass in (WindowWrapper,) :
+    for cłass in (Window,) :
         delattr(cłass, "__del__")
     #end for
 #end _atexit
