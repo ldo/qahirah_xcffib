@@ -1868,6 +1868,22 @@ class Window :
         self.conn.request_check(res.sequence)
     #end copy_pix_area
 
+    def set_name(self, name) :
+        "sets the displayed window name."
+        c_name = name.encode()
+        res = self.conn.conn.core.ChangeProperty \
+          (
+            mode = xproto.PropMode.Replace,
+            window = self.window,
+            property = XA.WM_NAME,
+            type = XA.STRING,
+            format = 8,
+            data_len = len(c_name),
+            data = name
+          )
+        self.conn.conn.flush()
+    #end set_name
+
 #end Window
 
 #+
