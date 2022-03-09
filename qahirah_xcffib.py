@@ -146,7 +146,7 @@ XA_NAME = dict \
   ( # atom value to name
     (n, getattr(XA, n))
     for n in dir(XA)
-    if not n.startswith("_")
+    if not n.startswith("_") and n != "LAST_PREDEFINED"
   )
 
 KEYCODE_MIN = 8
