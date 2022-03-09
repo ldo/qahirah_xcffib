@@ -1257,7 +1257,7 @@ class AtomCache :
     __slots__ = \
         (
             "__weakref__",
-            "conn",
+            "_w_conn",
             "name_to_atom",
             "atom_to_name",
             "preload_standard",
@@ -1281,7 +1281,7 @@ class AtomCache :
         if not isinstance(conn, Connection) :
             raise TypeError("conn must be a Connection")
         #end if
-        self.conn = conn
+        self._w_conn = weak_ref(conn)
         self.name_to_atom = {}
         self.atom_to_name = {}
         self.preload_standard = preload_standard
@@ -1327,7 +1327,7 @@ class AtomCache :
         if name in self.name_to_atom :
             result = self.name_to_atom[name]
         else :
-            res = self.conn.conn.core.InternAtom \
+            res = _wderef(self._w_conn, "Connection").conn.core.InternAtom \
               (
                 only_if_exists = not create_if,
                 name_len = len(name),
@@ -1360,14 +1360,15 @@ class AtomCache :
         else :
             async def do_lookup(w_self, lookup_done) :
                 self = _wderef(w_self, "Connection")
-                res = self.conn.conn.core.InternAtom \
+                conn = _wderef(self._w_conn, "Connection")
+                res = conn.conn.core.InternAtom \
                   (
                     only_if_exists = not create_if,
                     name_len = len(name),
                     name = name
                   )
-                self.conn.conn.flush()
-                reply = await self.conn.wait_for_reply(res)
+                conn.conn.flush()
+                reply = await conn.wait_for_reply(res)
                 result = reply.atom
                 if result != 0 :
                     self.name_to_atom[name] = result
@@ -1378,11 +1379,12 @@ class AtomCache :
                 lookup_done.set_result(result)
             #end do_lookup
 
-            lookup_done = self.conn.loop.create_future()
+            conn = _wderef(self._w_conn, "Connection")
+            lookup_done = conn.loop.create_future()
             self._lookup_queue.append(do_lookup(weak_ref(self), lookup_done))
             self._name_lookup_pending[name] = lookup_done
             if self._lookup_process == None :
-                self._lookup_process = self.conn.loop.create_task \
+                self._lookup_process = conn.loop.create_task \
                   (
                     self._process_queue(weak_ref(self))
                   )
@@ -1403,7 +1405,7 @@ class AtomCache :
         if atom in self.atom_to_name :
             result = self.atom_to_name[atom]
         else :
-            res = self.conn.conn.core.GetAtomName(atom)
+            res = _wderef(self._w_conn, "Connection").conn.core.GetAtomName(atom)
             result = b"".join(res.reply().name)
             self.name_to_atom[result] = atom
             self.atom_to_name[atom] = result
@@ -1427,20 +1429,22 @@ class AtomCache :
         else :
             async def do_lookup(w_self, lookup_done) :
                 self = _wderef(w_self, "Connection")
-                res = self.conn.conn.core.GetAtomName(atom)
-                self.conn.conn.flush()
-                reply = await self.conn.wait_for_reply(res)
+                conn = _wderef(self._w_conn, "Connection")
+                res = conn.conn.core.GetAtomName(atom)
+                conn.conn.flush()
+                reply = await conn.wait_for_reply(res)
                 result = b"".join(reply.name)
                 self.name_to_atom[result] = atom
                 self.atom_to_name[atom] = result
                 lookup_done.set_result(result)
             #end do_lookup
 
-            lookup_done = self.conn.loop.create_future()
+            conn = _wderef(self._w_conn, "Connection")
+            lookup_done = conn.loop.create_future()
             self._lookup_queue.append(do_lookup(weak_ref(self), lookup_done))
             self._atom_lookup_pending[atom] = lookup_done
             if self._lookup_process == None :
-                self._lookup_process = self.conn.loop.create_task \
+                self._lookup_process = conn.loop.create_task \
                   (
                     self._process_queue(weak_ref(self))
                   )
