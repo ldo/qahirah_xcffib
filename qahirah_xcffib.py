@@ -926,15 +926,21 @@ class Connection :
         # for input.
         self = _wderef(w_self, "Connection")
 
-        had_event = False
+        # need to check for request replies first, before events,
+        # otherwise these could be held up indefinitely by a
+        # never-ending stream of events
+        if len(self._reply_queue) != 0 :
+            action, arg = self._reply_queue.pop(0)
+            action(self, arg)
+        #end if
+
         if len(self._event_filters) != 0 :
             try :
                 event = self.conn.poll_for_event()
             except xcffib.XcffibException :
                 event = None
             #end try
-            had_event = event != None
-            if had_event :
+            if event != None :
                 event_filters = self._event_filters[:]
                   # copy in case actions make changes
                 while True :
@@ -947,15 +953,9 @@ class Connection :
                 #end while
             else :
                 if self.conn.has_error() :
-                    # raise RuntimeError("error on XCB connection")
-                    had_event = True # don’t bother looking for request replies
+                    pass # raise RuntimeError("error on XCB connection")
                 #end if
             #end if
-        #end if
-
-        if not had_event and len(self._reply_queue) != 0 :
-            action, arg = self._reply_queue.pop(0)
-            action(self, arg)
         #end if
 
         # always remove, then add back again if needed, to avoid
