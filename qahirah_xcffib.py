@@ -1885,6 +1885,7 @@ class Window :
     #end set_name
 
     def get_property(self, property, expect_type) :
+        "retrieves the entire value of the specified window property, as a bytes object."
         propval = b""
         propformat = proptype = None
         length = 16
@@ -1916,6 +1917,7 @@ class Window :
     #end get_property
 
     async def get_property_async(self, property, expect_type) :
+        "retrieves the entire value of the specified window property, as a bytes object."
         propval = b""
         propformat = proptype = None
         length = 16
