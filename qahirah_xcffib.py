@@ -2007,6 +2007,73 @@ class Window :
         self.conn.conn.request_check(res.sequence)
     #end delete_property
 
+    def get_protocols(self, decode = True) :
+        propformat, proptype, protocols = self.get_property \
+          (
+            property = self.conn.atom_cache.intern_atom("WM_PROTOCOLS"),
+            expect_type = XA.ATOM
+          )
+        if protocols == None :
+            protocols = []
+        else :
+            protocols = list \
+              (
+                self.conn.atom_cache.get_atom_name(p, decode)
+                for p in protocols
+              )
+        #end if
+        return \
+            protocols
+    #end get_protocols
+
+    async def get_protocols_async(self, decode = True) :
+        propformat, proptype, proplist = await self.get_property_async \
+          (
+            property = await self.conn.atom_cache.intern_atom_async("WM_PROTOCOLS"),
+            expect_type = XA.ATOM
+          )
+        # for some reason attempt to construct result directly as a list comprehension
+        # results in “TypeError: 'async_generator' object is not iterable”
+        protocols = []
+        if proplist != None :
+            for p in proplist :
+                protocols.append(await self.conn.atom_cache.get_atom_name_async(p, decode))
+            #end for
+        #end if
+        return \
+            protocols
+    #end get_protocols_async
+
+    def set_protocols(self, protocols) :
+        proplist = list \
+          (
+            self.conn.atom_cache.intern_atom(name)
+            for name in protocols
+          )
+        propid = self.conn.atom_cache.intern_atom("WM_PROTOCOLS")
+        if len(proplist) != 0 :
+            self.set_property(propid, XA.ATOM, 32, proplist)
+        else :
+            self.delete_property(propid)
+        #end if
+    #end set_protocols
+
+    async def set_protocols_async(self, protocols) :
+        # for some reason attempt to construct proplist directly as a list comprehension
+        # results in “TypeError: 'async_generator' object is not iterable”
+        proplist = []
+        for name in protocols :
+            proplist.append(await self.conn.atom_cache.intern_atom_async(name))
+        #end for
+        propid = await self.conn.atom_cache.intern_atom_async("WM_PROTOCOLS")
+        # no set/delete_property_async -- should I bother?
+        if len(proplist) != 0 :
+            self.set_property(propid, XA.ATOM, 32, proplist)
+        else :
+            self.delete_property(propid)
+        #end if
+    #end set_protocols_async
+
 #end Window
 
 #+
