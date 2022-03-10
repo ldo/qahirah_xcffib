@@ -12,6 +12,7 @@ with the xcffib binding.
 # <https://www.x.org/releases/X11R7.5/doc/libxcb/tutorial/index.html>
 # (linked from <https://www.x.org/releases/X11R7.5/doc/>)
 
+import struct
 import enum
 from weakref import \
     ref as weak_ref, \
@@ -1884,8 +1885,28 @@ class Window :
         self.conn.conn.flush()
     #end set_name
 
+    @staticmethod
+    def _decode_property(propval, propformat, proptype) :
+        if propval != None and (propformat != 8 or proptype != XA.STRING) :
+            assert propformat % 8 == 0
+            bytes_per_elt = propformat // 8
+            assert len(propval) % bytes_per_elt == 0
+            nr_elts = len(propval) // bytes_per_elt
+            result = struct.unpack \
+              (
+                "=" + {1 : "B", 2 : "H", 4 : "L", 8 : "Q"}[bytes_per_elt] * nr_elts,
+                propval
+              )
+        else :
+            result = propval
+        #end if
+        return \
+            result
+    #end _decode_property
+
     def get_property(self, property, expect_type) :
-        "retrieves the entire value of the specified window property, as a bytes object."
+        "retrieves the entire value of the specified window property," \
+        " as a bytestring or tuple of elements."
         propval = b""
         propformat = proptype = None
         length = 16
@@ -1919,11 +1940,12 @@ class Window :
             length = reply.bytes_after
         #end while
         return \
-            propformat, proptype, propval
+            propformat, proptype, self._decode_property(propval, propformat, proptype)
     #end get_property
 
     async def get_property_async(self, property, expect_type) :
-        "retrieves the entire value of the specified window property, as a bytes object."
+        "retrieves the entire value of the specified window property," \
+        " as a bytestring or tuple of elements."
         propval = b""
         propformat = proptype = None
         length = 16
@@ -1958,7 +1980,7 @@ class Window :
             length = reply.bytes_after
         #end while
         return \
-            propformat, proptype, propval
+            propformat, proptype, self._decode_property(propval, propformat, proptype)
     #end get_property_async
 
 #end Window
