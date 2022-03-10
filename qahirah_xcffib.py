@@ -1900,14 +1900,20 @@ class Window :
                 long_length = length
               )
             reply = res.reply()
-            if reply.type == 0 or reply.value_len == 0 :
+            if reply.type == 0 :
+                # nonexistent property
                 assert propformat == None and proptype == None
                 propval = None
                 break
             #end if
-            propval += b"".join(reply.value)
             propformat = reply.format
             proptype = reply.type
+            if reply.value_len == 0 :
+                # wrong expected type
+                propval = None
+                break
+            #end if
+            propval += b"".join(reply.value)
             if reply.bytes_after == 0 :
                 break
             length = reply.bytes_after
@@ -1933,14 +1939,20 @@ class Window :
               )
             self.conn.conn.flush()
             reply = await self.conn.wait_for_reply(res)
-            if reply.type == 0 or reply.value_len == 0 :
+            if reply.type == 0 :
+                # nonexistent property
                 assert propformat == None and proptype == None
                 propval = None
                 break
             #end if
-            propval += b"".join(reply.value)
             propformat = reply.format
             proptype = reply.type
+            if reply.value_len == 0 :
+                # wrong expected type
+                propval = None
+                break
+            #end if
+            propval += b"".join(reply.value)
             if reply.bytes_after == 0 :
                 break
             length = reply.bytes_after
