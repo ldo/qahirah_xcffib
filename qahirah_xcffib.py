@@ -1900,7 +1900,7 @@ class Window :
                 long_length = length
               )
             reply = res.reply()
-            if reply.type == 0 :
+            if reply.type == 0 or reply.value_len == 0 :
                 assert propformat == None and proptype == None
                 propval = None
                 break
@@ -1933,7 +1933,7 @@ class Window :
               )
             self.conn.conn.flush()
             reply = await self.conn.wait_for_reply(res)
-            if reply.type == 0 :
+            if reply.type == 0 or reply.value_len == 0 :
                 assert propformat == None and proptype == None
                 propval = None
                 break
