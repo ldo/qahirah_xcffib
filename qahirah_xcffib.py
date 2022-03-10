@@ -1884,6 +1884,69 @@ class Window :
         self.conn.conn.flush()
     #end set_name
 
+    def get_property(self, property, expect_type) :
+        propval = b""
+        propformat = proptype = None
+        length = 16
+        while True :
+            res = self.conn.conn.core.GetProperty \
+              (
+                delete = False,
+                window = self.window,
+                property = property,
+                type = expect_type,
+                long_offset = len(propval),
+                long_length = length
+              )
+            reply = res.reply()
+            if reply.type == 0 :
+                assert propformat == None and proptype == None
+                propval = None
+                break
+            #end if
+            propval += b"".join(reply.value)
+            propformat = reply.format
+            proptype = reply.type
+            if reply.bytes_after == 0 :
+                break
+            length = reply.bytes_after
+        #end while
+        return \
+            propformat, proptype, propval
+    #end get_property
+
+    async def get_property_async(self, property, expect_type) :
+        propval = b""
+        propformat = proptype = None
+        length = 16
+        while True :
+            res = self.conn.conn.core.GetProperty \
+              (
+                delete = False,
+                window = self.window,
+                property = property,
+                type = expect_type,
+                long_offset = len(propval),
+                long_length = length
+              )
+            self.conn.conn.flush()
+            reply = await self.conn.wait_for_reply(res)
+            if reply.type == 0 :
+                assert propformat == None and proptype == None
+                propval = None
+                break
+            #end if
+            propval += b"".join(reply.value)
+            propformat = reply.format
+            proptype = reply.type
+            if reply.bytes_after == 0 :
+                break
+            length = reply.bytes_after
+        #end while
+        return \
+            propformat, proptype, propval
+    #end get_property_async
+
 #end Window
 
 #+
