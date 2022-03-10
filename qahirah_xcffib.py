@@ -1983,6 +1983,21 @@ class Window :
             propformat, proptype, self._decode_property(propval, propformat, proptype)
     #end get_property_async
 
+    def set_property(self, propid, proptype, propformat, data) :
+        "replaces the entire value of the specified window property."
+        res = self.conn.conn.core.ChangeProperty \
+          (
+            mode = xproto.PropMode.Replace,
+            window = self.window,
+            property = propid,
+            type = proptype,
+            format = propformat,
+            data_len = len(data),
+            data = data
+          )
+        self.conn.conn.request_check(res.sequence)
+    #end set_property
+
 #end Window
 
 #+
