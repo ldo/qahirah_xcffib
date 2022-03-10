@@ -1998,6 +1998,15 @@ class Window :
         self.conn.conn.request_check(res.sequence)
     #end set_property
 
+    def delete_property(self, propid) :
+        res = self.conn.conn.core.DeleteProperty \
+          (
+            window = self.window,
+            property = propid
+          )
+        self.conn.conn.request_check(res.sequence)
+    #end delete_property
+
 #end Window
 
 #+
