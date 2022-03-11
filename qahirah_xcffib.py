@@ -905,9 +905,9 @@ class Connection :
     #end __init__
 
     @classmethod
-    def open(celf, loop = None) :
+    def open(celf, loop = None, *, display = None, fd = -1, auth = None) :
         "opens an xcffib.Connection and returns a Connection for it."
-        conn = xcffib.Connection()
+        conn = xcffib.Connection(display = display, fd = fd, auth = auth)
         return \
             celf(conn, loop)
     #end open
