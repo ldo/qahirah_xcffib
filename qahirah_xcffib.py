@@ -1674,6 +1674,16 @@ class Window :
         #end if
     #end __del__
 
+    def set_mapped(self, mapped : bool) :
+        "sets the window’s mapped (visible) state."
+        if mapped :
+            res = self.conn.conn.core.MapWindow(self.window)
+        else :
+            res = self.conn.conn.core.UnmapWindow(self.window)
+        #end if
+        self.conn.conn.request_check(res.sequence)
+    #end set_mapped
+
     @classmethod
     def get_window(celf, window) :
         "given an X11 window ID, returns the corresponding Window object." \
