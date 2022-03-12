@@ -1911,7 +1911,7 @@ class Window :
             value_mask = value_mask,
             value_list = value_list
           )
-        self.conn.request_check(res.sequence)
+        self.conn.conn.request_check(res.sequence)
     #end set_attributes
 
     def set_name(self, name) :
