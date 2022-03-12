@@ -1160,8 +1160,8 @@ class Connection :
             width = bounds.width,
             height = bounds.height,
             border_width = border_width,
-            _class = xcffib.XCB_COPY_FROM_PARENT,
-            visual = use_root.root_visual, # xcffib.XCB_COPY_FROM_PARENT,
+            _class = xproto.WindowClass.InputOutput,
+            visual = use_root.root_visual,
             value_mask = value_mask,
             value_list = value_list
           )
