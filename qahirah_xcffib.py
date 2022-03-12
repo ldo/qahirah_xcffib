@@ -1890,6 +1890,19 @@ class Window :
         self.conn.request_check(res.sequence)
     #end copy_pix_area
 
+    def get_attributes(self) :
+        res = self.conn.conn.core.GetWindowAttributes(self.window)
+        return \
+            res.reply()
+    #end get_attributes
+
+    def get_attributes_async(self) :
+        res = self.conn.conn.core.GetWindowAttributes(self.window)
+        self.conn.conn.flush()
+        return \
+            self.conn.wait_for_reply(res)
+    #end get_attributes_async
+
     def set_attributes(self, attrs) :
         value_mask, value_list = pack_attributes(attrs)
         res = self.conn.conn.core.ChangeWindowAttributes \
