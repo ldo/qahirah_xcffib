@@ -1890,6 +1890,17 @@ class Window :
         self.conn.request_check(res.sequence)
     #end copy_pix_area
 
+    def set_attributes(self, attrs) :
+        value_mask, value_list = pack_attributes(attrs)
+        res = self.conn.conn.core.ChangeWindowAttributes \
+          (
+            window = self.window,
+            value_mask = value_mask,
+            value_list = value_list
+          )
+        self.conn.request_check(res.sequence)
+    #end set_attributes
+
     def set_name(self, name) :
         "sets the displayed window name."
         c_name = name.encode()
