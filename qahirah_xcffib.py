@@ -1919,7 +1919,7 @@ class Window :
         " as a bytestring or tuple of elements."
         propval = b""
         propformat = proptype = None
-        length = 16
+        length = 16 # something convenient to begin with
         while True :
             res = self.conn.conn.core.GetProperty \
               (
@@ -1946,7 +1946,9 @@ class Window :
             #end if
             propval += b"".join(reply.value)
             if reply.bytes_after == 0 :
+                # got it all
                 break
+            # more to read
             length = reply.bytes_after
         #end while
         return \
@@ -1958,7 +1960,7 @@ class Window :
         " as a bytestring or tuple of elements."
         propval = b""
         propformat = proptype = None
-        length = 16
+        length = 16 # something convenient to begin with
         while True :
             res = self.conn.conn.core.GetProperty \
               (
@@ -1986,7 +1988,9 @@ class Window :
             #end if
             propval += b"".join(reply.value)
             if reply.bytes_after == 0 :
+                # got it all
                 break
+            # more to read
             length = reply.bytes_after
         #end while
         return \
