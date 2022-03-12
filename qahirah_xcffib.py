@@ -798,7 +798,7 @@ class XCBSurface(qahirah.XCBSurface) :
 # Main classes
 #-
 
-class CW_BIT(enum.IntEnum) :
+class WINATTR(enum.IntEnum) :
     "bit numbers corresponding to bit masks for window attributes to" \
     " create_window calls."
     # Note: must be specified in strictly increasing order
@@ -823,8 +823,43 @@ class CW_BIT(enum.IntEnum) :
         return 1 << self.value
     #end mask
 
-#end CW_BIT
-CW_BIT.COLORMAP = CW_BIT.COLOURMAP # if you prefer
+#end WINATTR
+WINATTR.COLORMAP = WINATTR.COLOURMAP # if you prefer
+
+def pack_attributes(attrs, default_attrs = None) :
+    "converts window attributes from my sequence-of-key+value form" \
+    " to the mask+ordered-value-list form that X11 expects. If not" \
+    " None, default_attrs is used to fill in defaults not specified" \
+    " in attrs."
+    if (
+            not isinstance(attrs, (tuple, list))
+        or
+            not all
+              (
+                    len(i) == 2
+                and
+                    isinstance(i[0], WINATTR)
+                and
+                    isinstance(i[1], int)
+                for i in attrs
+              )
+    ) :
+        raise TypeError("attrs is not sequence of (WINATTR.xxx, value) pairs")
+    #end if
+    value_mask = 0
+    value_list = []
+    attrs = tuple(attrs)
+    if default_attrs != None :
+        specified = set(i[0] for i in attrs)
+        attrs += tuple(i for i in default_attrs if i[0] not in specified)
+    #end if
+    for bit_nr, value in sorted(attrs, key = lambda x : x[0]) :
+        value_mask |= bit_nr.mask
+        value_list.append(value)
+    #end for
+    return \
+        value_mask, value_list
+#end pack_attributes
 
 class GC_BIT(enum.IntEnum) :
     "bit numbers corresponding to bit masks for GC attributes to" \
@@ -1114,42 +1149,18 @@ class Connection :
 
     def _easy_create_window(self, bounds : qahirah.Rect, border_width : int, set_attrs) :
         # common code for both easy_create_window and easy_create_window_async.
-        if (
-                not isinstance(set_attrs, (tuple, list))
-            or
-                not all
-                  (
-                        len(i) == 2
-                    and
-                        isinstance(i[0], CW_BIT)
-                    and
-                        isinstance(i[1], int)
-                    for i in set_attrs
-                  )
-        ) :
-            raise TypeError("set_attrs is not sequence of (CW_BIT.xxx, value) pairs")
-        #end if
         default_screen = self.conn.get_screen_pointers()[0]
         use_root = self.conn.get_setup().roots[0]
         window = self.conn.generate_id()
-        value_mask = 0
-        value_list = []
-        default_set_attrs = \
-            ( # defaults if not specified by user
-                (CW_BIT.BACKPIXEL, use_root.white_pixel),
-                (CW_BIT.BORDERPIXEL, use_root.black_pixel),
-            )
-        user_specified = set(i[0] for i in set_attrs)
-        set_attrs = \
-            (
-                tuple(set_attrs)
-            +
-                tuple(i for i in default_set_attrs if i[0] not in user_specified)
-            )
-        for bit_nr, value in sorted(set_attrs, key = lambda x : x[0]) :
-            value_mask |= bit_nr.mask
-            value_list.append(value)
-        #end for
+        value_mask, value_list = pack_attributes \
+          (
+            attrs = set_attrs,
+            default_attrs =
+              (
+                (WINATTR.BACKPIXEL, use_root.white_pixel),
+                (WINATTR.BORDERPIXEL, use_root.black_pixel),
+              )
+          )
         res = self.conn.core.CreateWindow \
           (
             depth = xcffib.XCB_COPY_FROM_PARENT,
@@ -1172,7 +1183,7 @@ class Connection :
     def easy_create_window(self, bounds : qahirah.Rect, border_width : int, set_attrs) :
         "convenience wrapper which handles a lot of the seeming repetitive tasks" \
         " associated with window creation. set_attrs is a sequence of" \
-        " («bit_nr», «value») pairs where each bit_nr is a member of the CW_BIT" \
+        " («bit_nr», «value») pairs where each bit_nr is a member of the WINATTR" \
         " enumeration identifying a window attribute, and «value» is the" \
         " corresponding integer value to set for that attribute. Attributes may" \
         " be specified in any order."
