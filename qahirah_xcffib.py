@@ -860,25 +860,29 @@ class MaskAttr(enum.IntEnum) :
         " None, default_attrs is used to fill in defaults not specified" \
         " in attrs."
         if (
-            not all
-              (
-                    isinstance(a, (tuple, list))
-                and
-                    all
-                      (
-                            len(i) == 2
-                        and
-                            isinstance(i[0], celf)
-                        and
-                            isinstance(i[1], int)
-                        for i in a
-                      )
-                for a in (attrs,) + ((), (default_attrs,))[default_attrs != None]
-              )
+                not all
+                  (
+                        isinstance(a, (tuple, list))
+                    and
+                        all
+                          (
+                                len(i) == 2
+                            and
+                                isinstance(i[0], celf)
+                            and
+                                isinstance(i[1], int)
+                            for i in a
+                          )
+                    for a in (attrs,) + ((), (default_attrs,))[default_attrs != None]
+                  )
+            or
+                len(set(i[0] for i in attrs)) != len(attrs)
         ) :
             raise TypeError \
               (
-                "attributes are not sequences of (%s.xxx, value) pairs" % celf.__name__
+                    "attributes are not unique-keyed sequence of (%s.xxx, value) pairs"
+                %
+                    celf.__name__
               )
         #end if
         value_mask = 0
