@@ -2313,13 +2313,99 @@ class Window :
 
 #end Window
 
+class GContext :
+    "convenient wrapper object around an X11 graphics context."
+
+    __slots__ = \
+        (
+            "__weakref__",
+            "id",
+            "conn",
+            "user_data", # dict, initially empty, may be used by caller for any purpose
+        ) # to forestall typos
+
+    _instances = WeakValueDictionary()
+    _ud_refs = WeakValueDictionary()
+
+    def __new__(celf, conn, id) :
+        self = celf._instances.get(id)
+        if self == None :
+            self = super().__new__(celf)
+            self.conn = conn
+            self.id = id
+            user_data = celf._ud_refs.get(id)
+            if user_data == None :
+                user_data = qahirah.UserDataDict()
+                celf._ud_refs[id] = user_data
+            #end if
+            self.user_data = user_data
+            celf._instances[id] = self
+        #end if
+        return \
+            self
+    #end __new__
+
+    @classmethod
+    def create(celf, conn, drawable_id, set_attrs = None) :
+        if set_attrs == None :
+            set_attrs = ()
+        #end if
+        id = conn.conn.generate_id()
+        value_mask, value_list = GCATTR.pack_attributes(set_attrs)
+        res = conn.conn.core.CreateGC(id, drawable_id, value_mask, value_list)
+        conn.conn.request_check(res.sequence)
+        return \
+            celf(conn, id)
+    #end create
+
+    def set_attributes(self, attrs) :
+        value_mask, value_list = GCATTR.pack_attributes(attrs)
+        res = self.conn.conn.core.ChangeGCAttributes \
+          (
+            gc = self.id,
+            value_mask = value_mask,
+            value_list = value_list
+          )
+        self.conn.conn.request_check(res.sequence)
+    #end set_attributes
+
+    def copy_from(self, other, attrs) :
+        if not isinstance(other, GContext) :
+            raise TypeError("object to copy settings from must also be a GContext")
+        #end if
+        res = self.conn.conn.core.CopyGC \
+          (
+            src_gc = other.id,
+            dst_gc = self.id,
+            value_mask = GCATTR.make_mask(attrs)
+          )
+        self.conn.conn.request_check(res.sequence)
+    #end copy_from
+
+    def destroy(self) :
+        if self.id != None :
+            if self.conn != None :
+                res = self.conn.conn.core.FreeGC(self.id)
+                self.conn.conn.request_check(res.sequence)
+                self.conn = None
+            #end if
+            self.id = None
+        #end if
+    #end destroy
+
+    def __del__(self) :
+        self.destroy()
+    #end __del__(self)
+
+#end GContext
+
 #+
 # Cleanup
 #-
 
 def _atexit() :
     # disable all __del__ methods at process termination to avoid segfaults
-    for cłass in (Window, Pixmap, Cursor) :
+    for cłass in (Window, Pixmap, Cursor, GContext) :
         delattr(cłass, "__del__")
     #end for
 #end _atexit
