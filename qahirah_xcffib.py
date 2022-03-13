@@ -1830,7 +1830,7 @@ class Window :
             "id",
             "conn",
             "loop",
-            "gc",
+            "gcontext",
             "user_data", # dict, initially empty, may be used by caller for any purpose
             "_event_filters",
         ) # to forestall typos
@@ -1852,12 +1852,7 @@ class Window :
             self.user_data = user_data
             self._event_filters = []
             self.loop = conn.loop
-            self.gc = self.conn.conn.generate_id()
-              # Note that, if window wrapper object was lost but window ID
-              # is still valid on server, then a new GC will be created
-              # to go with the new window wrapper object. C’est la vie.
-            res = self.conn.conn.core.CreateGC(self.gc, self.id, 0, [])
-            self.conn.conn.request_check(res.sequence)
+            self.gcontext = GContext.create(conn, id)
             celf._instances[id] = self
             self.conn.add_event_filter(self._conn_event_filter, weak_ref(self))
         #end if
@@ -2067,7 +2062,7 @@ class Window :
           (
             src_drawable = src.id,
             dst_drawable = self.id,
-            gc = self.gc,
+            gc = self.gcontext.id,
             src_x = src_pos.x,
             src_y = src_pos.y,
             dst_x = dst_pos.x,
