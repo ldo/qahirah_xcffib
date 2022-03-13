@@ -2309,7 +2309,12 @@ class Window :
 #end Window
 
 class GContext :
-    "convenient wrapper object around an X11 graphics context."
+    "convenient wrapper object around an X11 graphics context.\n" \
+    "\n" \
+    "Note that only a subset of X11 drawing calls are supported;" \
+    " the expectation is that the bulk of drawing will be done with" \
+    " Cairo. So only the minimum of calls necessary to interface" \
+    " Cairo-rendered graphics with the X server are implemented here."
 
     __slots__ = \
         (
