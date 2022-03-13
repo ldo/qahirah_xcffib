@@ -2370,6 +2370,8 @@ class GContext :
     #end set_attributes
 
     def copy_from(self, other, attrs) :
+        "copies attributes from another GContext selected by the specified" \
+        " GCATTR values."
         if not isinstance(other, GContext) :
             raise TypeError("object to copy settings from must also be a GContext")
         #end if
