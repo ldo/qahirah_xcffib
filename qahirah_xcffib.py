@@ -1639,7 +1639,7 @@ class Window :
     __slots__ = \
         (
             "__weakref__",
-            "window",
+            "id",
             "conn",
             "loop",
             "gc",
@@ -1650,16 +1650,16 @@ class Window :
     _instances = WeakValueDictionary()
     _ud_refs = WeakValueDictionary()
 
-    def __new__(celf, conn, window) :
-        self = celf._instances.get(window)
+    def __new__(celf, conn, id) :
+        self = celf._instances.get(id)
         if self == None :
             self = super().__new__(celf)
             self.conn = conn
-            self.window = window
-            user_data = celf._ud_refs.get(window)
+            self.id = id
+            user_data = celf._ud_refs.get(id)
             if user_data == None :
                 user_data = qahirah.UserDataDict()
-                celf._ud_refs[window] = user_data
+                celf._ud_refs[id] = user_data
             #end if
             self.user_data = user_data
             self._event_filters = []
@@ -1668,9 +1668,9 @@ class Window :
               # Note that, if window wrapper object was lost but window ID
               # is still valid on server, then a new GC will be created
               # to go with the new window wrapper object. C’est la vie.
-            res = self.conn.conn.core.CreateGC(self.gc, self.window, 0, [])
+            res = self.conn.conn.core.CreateGC(self.gc, self.id, 0, [])
             self.conn.conn.request_check(res.sequence)
-            celf._instances[window] = self
+            celf._instances[id] = self
             self.conn.add_event_filter(self._conn_event_filter, weak_ref(self))
         #end if
         return \
@@ -1681,32 +1681,32 @@ class Window :
         if self.conn != None :
             self.conn.remove_event_filter(self._conn_event_filter, weak_ref(self), optional = True)
             self.conn = None
-            del type(self)._instances[self.window]
+            del type(self)._instances[self.id]
         #end if
     #end __del__
 
     def set_mapped(self, mapped : bool) :
         "sets the window’s mapped (visible) state."
         if mapped :
-            res = self.conn.conn.core.MapWindow(self.window)
+            res = self.conn.conn.core.MapWindow(self.id)
         else :
-            res = self.conn.conn.core.UnmapWindow(self.window)
+            res = self.conn.conn.core.UnmapWindow(self.id)
         #end if
         self.conn.conn.request_check(res.sequence)
     #end set_mapped
 
     @classmethod
-    def get_window(celf, window) :
+    def get_window(celf, id) :
         "given an X11 window ID, returns the corresponding Window object." \
         " Assumes one already exists!"
         return \
-            celf._instances[window]
+            celf._instances[id]
     #end get_window
 
     @staticmethod
     def _conn_event_filter(event, w_self) :
         self = _wderef(w_self, "Window")
-        if isinstance(event, Exception) or event.window == self.window :
+        if isinstance(event, Exception) or event.window == self.id :
             event_filters = self._event_filters[:]
               # copy in case actions make changes
             while True :
@@ -1760,9 +1760,9 @@ class Window :
         if not isinstance(conn, Connection) :
             raise TypeError("conn must be a Connection")
         #end if
-        window = conn.easy_create_window(bounds, border_width, set_attrs)
+        id = conn.easy_create_window(bounds, border_width, set_attrs)
         return \
-            celf(conn, window)
+            celf(conn, id)
     #end easy_create
 
     @classmethod
@@ -1770,18 +1770,18 @@ class Window :
         if not isinstance(conn, Connection) :
             raise TypeError("conn must be a Connection")
         #end if
-        window = await conn.easy_create_window_async(bounds, border_width, set_attrs)
+        id = await conn.easy_create_window_async(bounds, border_width, set_attrs)
         return \
-            celf(conn, window)
+            celf(conn, id)
     #end easy_create_async
 
     def destroy(self) :
-        res = self.conn.core.DestroyWindow(self.window)
+        res = self.conn.core.DestroyWindow(self.id)
         self.conn.request_check(res.sequence)
     #end destroy
 
     def destroy_async(self) :
-        res = self.conn.core.DestroyWindow(self.window)
+        res = self.conn.core.DestroyWindow(self.id)
         return \
             self.conn.wait_for_reply(res)
     #end destroy_async
@@ -1817,7 +1817,7 @@ class Window :
         " these will need to be fixed up with a set_size() call when you" \
         " receive a ConfigureNotifyEvent for the window."
         return \
-            self.conn.easy_create_surface(self.window, (10, 10), use_xrender)
+            self.conn.easy_create_surface(self.id, (10, 10), use_xrender)
     #end easy_create_surface
 
     def _easy_create_pixmap(self, dimensions : qahirah.Vector, use_xrender : bool) :
@@ -1827,7 +1827,7 @@ class Window :
         res = self.conn.conn.core.CreatePixmap \
           (
             pid = pixmap_id,
-            drawable = self.window,
+            drawable = self.id,
             depth = 24, # does 32 work?
             width = dimensions.x,
             height = dimensions.y
@@ -1878,7 +1878,7 @@ class Window :
         res = self.conn.CopyArea \
           (
             src_drawable = src.id,
-            dst_drawable = self.window,
+            dst_drawable = self.id,
             gc = self.gc,
             src_x = src_pos.x,
             src_y = src_pos.y,
@@ -1891,13 +1891,13 @@ class Window :
     #end copy_pix_area
 
     def get_attributes(self) :
-        res = self.conn.conn.core.GetWindowAttributes(self.window)
+        res = self.conn.conn.core.GetWindowAttributes(self.id)
         return \
             res.reply()
     #end get_attributes
 
     def get_attributes_async(self) :
-        res = self.conn.conn.core.GetWindowAttributes(self.window)
+        res = self.conn.conn.core.GetWindowAttributes(self.id)
         self.conn.conn.flush()
         return \
             self.conn.wait_for_reply(res)
@@ -1907,7 +1907,7 @@ class Window :
         value_mask, value_list = pack_attributes(attrs)
         res = self.conn.conn.core.ChangeWindowAttributes \
           (
-            window = self.window,
+            window = self.id,
             value_mask = value_mask,
             value_list = value_list
           )
@@ -1920,7 +1920,7 @@ class Window :
         res = self.conn.conn.core.ChangeProperty \
           (
             mode = xproto.PropMode.Replace,
-            window = self.window,
+            window = self.id,
             property = XA.WM_NAME,
             type = XA.STRING,
             format = 8,
@@ -1959,7 +1959,7 @@ class Window :
             res = self.conn.conn.core.GetProperty \
               (
                 delete = False,
-                window = self.window,
+                window = self.id,
                 property = property,
                 type = expect_type,
                 long_offset = len(propval),
@@ -2000,7 +2000,7 @@ class Window :
             res = self.conn.conn.core.GetProperty \
               (
                 delete = False,
-                window = self.window,
+                window = self.id,
                 property = property,
                 type = expect_type,
                 long_offset = len(propval),
@@ -2037,7 +2037,7 @@ class Window :
         res = self.conn.conn.core.ChangeProperty \
           (
             mode = xproto.PropMode.Replace,
-            window = self.window,
+            window = self.id,
             property = propid,
             type = proptype,
             format = propformat,
@@ -2050,7 +2050,7 @@ class Window :
     def delete_property(self, propid) :
         res = self.conn.conn.core.DeleteProperty \
           (
-            window = self.window,
+            window = self.id,
             property = propid
           )
         self.conn.conn.request_check(res.sequence)
