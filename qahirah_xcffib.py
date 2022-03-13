@@ -834,10 +834,87 @@ class XCBSurface(qahirah.XCBSurface) :
 # Main classes
 #-
 
-class WINATTR(enum.IntEnum) :
+class MaskAttr(enum.IntEnum) :
+    "Base class for various X11 data which is passed as a bitmask" \
+    " indicating which values are present, followed by a list of" \
+    " those (integer) values in order of increasing bit number. I" \
+    " define a more convenient form, where you pass a sequence of" \
+    " pairs, each element of which is a bit number followed by the" \
+    " corresponding value, allowing the bit numbers to be in any" \
+    " order, the values being automatically sorted into the right" \
+    " order as the bit mask is generated from the bit numbers by" \
+    " calling the pack_attributes method.\n" \
+    "\n" \
+    "Subclasses just have to define the bit numbers in increasing order."
+
+    @property
+    def mask(self) :
+        "the mask for this bit number."
+        return 1 << self.value
+    #end mask
+
+    @classmethod
+    def pack_attributes(celf, attrs, default_attrs = None) :
+        "converts attributes from my sequence-of-key+value form" \
+        " to the mask+ordered-value-list form that X11 expects. If not" \
+        " None, default_attrs is used to fill in defaults not specified" \
+        " in attrs."
+        if (
+            not all
+              (
+                    isinstance(a, (tuple, list))
+                and
+                    all
+                      (
+                            len(i) == 2
+                        and
+                            isinstance(i[0], celf)
+                        and
+                            isinstance(i[1], int)
+                        for i in a
+                      )
+                for a in (attrs,) + ((), (default_attrs,))[default_attrs != None]
+              )
+        ) :
+            raise TypeError \
+              (
+                "attributes are not sequences of (%s.xxx, value) pairs" % celf.__name__
+              )
+        #end if
+        value_mask = 0
+        value_list = []
+        attrs = tuple(attrs)
+        if default_attrs != None :
+            specified = set(i[0] for i in attrs)
+            attrs += tuple(i for i in default_attrs if i[0] not in specified)
+        #end if
+        for bit_nr, value in sorted(attrs, key = lambda x : x[0]) :
+            value_mask |= bit_nr.mask
+            value_list.append(value)
+        #end for
+        return \
+            value_mask, value_list
+    #end pack_attributes
+
+    @classmethod
+    def make_mask(celf, attrs) :
+        "constructs a mask from the attribute bits in attrs."
+        value_mask = 0
+        for a in attrs :
+            if not isinstance(a, celf) :
+                raise TypeError("elements of attrs are not %s" % celf.__name__)
+            #end if
+            value_mask |= a.mask
+        #end for
+        return \
+            value_mask
+    #end make_mask
+
+#end MaskAttr
+
+class WINATTR(MaskAttr) :
     "bit numbers corresponding to bit masks for window attributes to" \
     " create_window calls."
-    # Note: must be specified in strictly increasing order
     BACKPIXMAP = 0
     BACKPIXEL = 1
     BORDERPIXMAP = 2
@@ -854,53 +931,12 @@ class WINATTR(enum.IntEnum) :
     COLOURMAP = 13
     CURSOR = 14
 
-    @property
-    def mask(self) :
-        return 1 << self.value
-    #end mask
-
 #end WINATTR
 WINATTR.COLORMAP = WINATTR.COLOURMAP # if you prefer
 
-def pack_attributes(attrs, default_attrs = None) :
-    "converts window attributes from my sequence-of-key+value form" \
-    " to the mask+ordered-value-list form that X11 expects. If not" \
-    " None, default_attrs is used to fill in defaults not specified" \
-    " in attrs."
-    if (
-            not isinstance(attrs, (tuple, list))
-        or
-            not all
-              (
-                    len(i) == 2
-                and
-                    isinstance(i[0], WINATTR)
-                and
-                    isinstance(i[1], int)
-                for i in attrs
-              )
-    ) :
-        raise TypeError("attrs is not sequence of (WINATTR.xxx, value) pairs")
-    #end if
-    value_mask = 0
-    value_list = []
-    attrs = tuple(attrs)
-    if default_attrs != None :
-        specified = set(i[0] for i in attrs)
-        attrs += tuple(i for i in default_attrs if i[0] not in specified)
-    #end if
-    for bit_nr, value in sorted(attrs, key = lambda x : x[0]) :
-        value_mask |= bit_nr.mask
-        value_list.append(value)
-    #end for
-    return \
-        value_mask, value_list
-#end pack_attributes
-
-class GC_BIT(enum.IntEnum) :
+class GCATTR(MaskAttr) :
     "bit numbers corresponding to bit masks for GC attributes to" \
-    " create_gc calls. Not actually supported for now."
-    # Note: must be specified in strictly increasing order
+    " create_gc calls."
     FUNCTION = 0
     PLANEMASK = 1
     FOREGROUND = 2
@@ -925,12 +961,7 @@ class GC_BIT(enum.IntEnum) :
     DASHLIST = 21
     ARCMODE = 22
 
-    @property
-    def mask(self) :
-        return 1 << self.value
-    #end mask
-
-#end GC_BIT
+#end GCATTR
 
 class Connection :
     "wraps an XCB connection to the X server. You can instantiate directly," \
@@ -1188,7 +1219,7 @@ class Connection :
         default_screen = self.conn.get_screen_pointers()[0]
         use_root = self.conn.get_setup().roots[0]
         window = self.conn.generate_id()
-        value_mask, value_list = pack_attributes \
+        value_mask, value_list = WINATTR.pack_attributes \
           (
             attrs = set_attrs,
             default_attrs =
@@ -2061,7 +2092,7 @@ class Window :
     #end get_attributes_async
 
     def set_attributes(self, attrs) :
-        value_mask, value_list = pack_attributes(attrs)
+        value_mask, value_list = WINATTR.pack_attributes(attrs)
         res = self.conn.conn.core.ChangeWindowAttributes \
           (
             window = self.id,
