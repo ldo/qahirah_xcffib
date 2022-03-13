@@ -1667,6 +1667,127 @@ class Pixmap :
 
 #end Pixmap
 
+class Cursor :
+
+    __slots__ = \
+        (
+            "__weakref__",
+            "conn",
+            "id",
+            "user_data", # dict, initially empty, may be used by caller for any purpose
+        ) # to forestall typos
+
+    _instances = WeakValueDictionary()
+    _ud_refs = WeakValueDictionary()
+
+    def __new__(celf, conn, id) :
+        self = celf._instances.get(id)
+        if self == None :
+            self = super().__new__(celf)
+            self.conn = conn
+            self.id = id
+            user_data = celf._ud_refs.get(id)
+            if user_data == None :
+                user_data = qahirah.UserDataDict()
+                celf._ud_refs[id] = user_data
+            #end if
+            self.user_data = user_data
+            celf._instances[id] = self
+        #end if
+        return \
+            self
+    #end __new__
+
+    @classmethod
+    def create \
+      (
+        celf,
+        conn : Connection,
+        source : Pixmap,
+        mask : Pixmap,
+        forecolour : Colour,
+        backcolour : Colour,
+        hotspot : qahirah.Vector
+      ) :
+        if (
+                not isinstance(conn, Connection)
+            or
+                not isinstance(source, Pixmap)
+            or
+                mask != None and not isinstance(mask, Pixmap)
+            or
+                not isinstance(forecolour, qahirah.Colour)
+            or
+                not isinstance(backcolour, qahirah.Colour)
+            or
+                not isinstance(hotspot, qahirah.Vector)
+            or
+                not all(isinstance(x, int) and 0 <= x < 65536 for x in tuple(hotspot))
+        ) :
+            raise TypeError("bad args")
+        #end if
+        id = conn.conn.generate_id()
+        fore_rgb = Colour.from_colour(forecolour).to_card16_rgb()
+        back_rgb = Colour.from_colour(backcolour).to_card16_rgb()
+        res = conn.conn.core.CreateCursor \
+          (
+            cid = id,
+            source = source.id,
+            mask =
+                (
+                    lambda : 0,
+                    lambda : mask.id,
+                )[mask != None](),
+            fore_red = fore_rgb[0],
+            fore_green = fore_rgb[1],
+            fore_blue = fore_rgb[2],
+            back_red = back_rgb[0],
+            back_green = back_rgb[1],
+            back_blue = back_rgb[2],
+            x = hotspot.x,
+            y = hotspot.y
+          )
+        conn.conn.request_check(res.sequence)
+        return \
+            celf(conn, id)
+    #end create
+
+    def __del__(self) :
+        if self.conn != None :
+            if self.id != None :
+                res = self.conn.conn.core.FreeCursor(self.id)
+                self.conn.conn.request_check(res.sequence)
+                self.id = None
+            #end if
+            self.conn = None
+        #end if
+    #end __del__
+
+    def recolour(self, forecolour : Colour, backcolour : Colour) :
+        if (
+                not isinstance(forecolour, qahirah.Colour)
+            or
+                not isinstance(backcolour, qahirah.Colour)
+        ) :
+            raise TypeError("colours must be Colour values")
+        #end if
+        fore_rgb = Colour.from_colour(forecolour).to_card16_rgb()
+        back_rgb = Colour.from_colour(backcolour).to_card16_rgb()
+        res = self.conn.conn.core.RecolorCursor \
+          (
+            cursor = self.id,
+            fore_red = fore_rgb[0],
+            fore_green = fore_rgb[1],
+            fore_blue = fore_rgb[2],
+            back_red = back_rgb[0],
+            back_green = back_rgb[1],
+            back_blue = back_rgb[2]
+          )
+        self.conn.conn.request_check(res.sequence)
+    #end recolour
+
+#end Cursor
+
 class Window :
     "convenience wrapper object around a specific X11 window, with" \
     " appropriately-filtered event dispatching. Do not instantiate" \
@@ -2167,7 +2288,7 @@ class Window :
 
 def _atexit() :
     # disable all __del__ methods at process termination to avoid segfaults
-    for cłass in (Window, Pixmap) :
+    for cłass in (Window, Pixmap, Cursor) :
         delattr(cłass, "__del__")
     #end for
 #end _atexit
