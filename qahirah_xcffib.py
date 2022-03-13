@@ -1894,19 +1894,37 @@ class Window :
               # copy in case actions make changes
             while True :
                 try :
-                    action, arg = event_filters.pop(0)
+                    action, arg, selevents = event_filters.pop(0)
                 except IndexError :
                     break
                 #end try
-                action(self, event, arg)
+                if selevents != None and hasattr(event, "response_type") :
+                    response_type = event.response_type & 127
+                      # strip off synthetic bit
+                else :
+                    response_type = None
+                #end if
+                if selevents == None or response_type in selevents :
+                    action(self, event, arg)
+                #end if
             #end while
         #end if
     #end _conn_event_filter
 
-    def add_event_filter(self, action, arg) :
-        "installs a filter which gets to see all incoming events for this window." \
-        " It is invoked as “action(window, event, arg)” where the meaning of arg" \
-        " is up to you."
+    def add_event_filter(self, action, arg, selevents = None) :
+        "installs a filter which gets to see the specified incoming events (or all" \
+        " events if not specified) for this window. It is invoked as" \
+        " “action(window, event, arg)” where the meaning of arg is up to you." \
+        "\n" \
+        "Only one instance of any action+arg combination is allowed to be" \
+        " installed at a time."
+        if (
+                selevents != None
+            and
+                not all(isinstance(e, int) and e >= 2 for e in selevents)
+        ) :
+            raiseTypeError("selevents is not a set or sequence of integer event codes")
+        #end if
         if (
             any
               (
@@ -1917,7 +1935,7 @@ class Window :
         ) :
             raise KeyError("attempt to install duplicate action+arg")
         #end if
-        self._event_filters.append((action, arg))
+        self._event_filters.append((action, arg, selevents))
     #end add_event_filter
 
     def remove_event_filter(self, action, arg, optional : bool) :
