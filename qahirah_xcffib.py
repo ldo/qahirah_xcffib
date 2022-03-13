@@ -69,6 +69,42 @@ def _get_conn(connection) :
         int(_ffi.cast(_ffi_size_t, connection._conn))
 #end _get_conn
 
+class Colour(qahirah.Colour) :
+    "extend qahirah.Colour with conversions to/from X11 format."
+
+    @classmethod
+    def from_colour(celf, c) :
+        "converts a superclass instance to an instance of this class."
+        return \
+            celf(*tuple(c))
+    #end from_colour
+
+    def to_card16_rgb(self) :
+        "returns (r, g, b) tuple where each component is a card16."
+        return \
+            tuple(round(c * 65535) for c in (self.r, self.g, self.b))
+    #end to_card16_rgb
+
+    @classmethod
+    def from_card16_rgb(celf, components) :
+        "converts (r, g, b) tuple where each component is a card16 to a Colour."
+        if (
+                not isinstance(components, (tuple, list))
+            or
+                len(components) != 3
+            or
+                not all(isinstance(c, int) for c in components)
+            or
+                not all(0 <= c < 65536 for c in components)
+        ) :
+            raise TypeError("components must be an (r, g, b) of card16 values")
+        #end if
+        return \
+            celf(*tuple(c / 65535 for c in components) + (1,))
+    #end from_card16_rgb
+
+#end Colour
+
 #+
 # X11 protocol definitions
 #-
