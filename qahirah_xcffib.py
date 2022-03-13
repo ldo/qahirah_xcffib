@@ -2392,6 +2392,67 @@ class GContext :
         self.destroy()
     #end __del__(self)
 
+    def copy_area \
+      (
+        self,
+        src_drawable : int,
+        dst_drawable : int,
+        src_pos : qahirah.Vector,
+        dst_pos : qahirah.Vector,
+        dimensions : qahirah.Vector
+      ) :
+        "does a CopyArea call from the specified part of the source" \
+        " drawable to the specified position within the destination drawable."
+        src_pos = qahirah.Vector.from_tuple(src_pos)
+        dst_pos = qahirah.Vector.from_tuple(dst_pos)
+        dimensions = qahirah.Vector.from_tuple(dimensions)
+        res = self.conn.conn.core.CopyArea \
+          (
+            src_drawable = src_drawable,
+            dst_drawable = dst_drawable,
+            gc = self.id,
+            src_x = src_pos.x,
+            src_y = src_pos.y,
+            dst_x = dst_pos.x,
+            dst_y = dst_pos.y,
+            width = dimensions.x,
+            height = dimensions.y
+          )
+        self.conn.conn.request_check(res.sequence)
+    #end copy_area
+
+    def copy_plane \
+      (
+        self,
+        src_drawable : int,
+        dst_drawable : int,
+        src_pos : qahirah.Vector,
+        dst_pos : qahirah.Vector,
+        dimensions : qahirah.Vector,
+        bit_plane : int
+      ) :
+        "does a CopyPlane call from the specified part and bit plane of the" \
+        " source drawable to the specified position within the destination" \
+        " drawable."
+        src_pos = qahirah.Vector.from_tuple(src_pos)
+        dst_pos = qahirah.Vector.from_tuple(dst_pos)
+        dimensions = qahirah.Vector.from_tuple(dimensions)
+        res = self.conn.conn.core.CopyPlane \
+          (
+            src_drawable = src_drawable,
+            dst_drawable = dst_drawable,
+            gc = self.id,
+            src_x = src_pos.x,
+            src_y = src_pos.y,
+            dst_x = dst_pos.x,
+            dst_y = dst_pos.y,
+            width = dimensions.x,
+            height = dimensions.y,
+            bit_plane = bit_plane
+          )
+        self.conn.conn.request_check(res.sequence)
+    #end copy_plane
+
 #end GContext
 
 #+
