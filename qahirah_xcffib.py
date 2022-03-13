@@ -1820,7 +1820,7 @@ class Window :
             self.conn.easy_create_surface(self.id, (10, 10), use_xrender)
     #end easy_create_surface
 
-    def _easy_create_pixmap(self, dimensions : qahirah.Vector, use_xrender : bool) :
+    def _easy_create_pixmap(self, depth : int, dimensions : qahirah.Vector, use_xrender : bool) :
         # common code for both easy_create_pixmap and easy_create_pixmap_async.
         pixmap_id = self.conn.conn.generate_id()
         dimensions = qahirah.Vector.from_tuple(dimensions)
@@ -1828,7 +1828,7 @@ class Window :
           (
             pid = pixmap_id,
             drawable = self.id,
-            depth = 24, # does 32 work?
+            depth = depth,
             width = dimensions.x,
             height = dimensions.y
           )
@@ -1836,17 +1836,17 @@ class Window :
             pixmap_id, res
     #end _easy_create_pixmap
 
-    def easy_create_pixmap(self, dimensions : qahirah.Vector, use_xrender : bool) :
-        pixmap_id, res = self._easy_create_pixmap(dimensions, use_xrender)
+    def easy_create_pixmap(self, depth : int, dimensions : qahirah.Vector, use_xrender : bool) :
+        pixmap_id, res = self._easy_create_pixmap(depth, dimensions, use_xrender)
         self.conn.conn.request_check(res.sequence)
         surface = self.conn.easy_create_surface(pixmap_id, dimensions, use_xrender)
         return \
             Pixmap(pixmap_id, surface, self)
     #end easy_create_pixmap
 
-    async def easy_create_pixmap_async(self, dimensions : qahirah.Vector, use_xrender : bool) :
+    async def easy_create_pixmap_async(self, depth : int, dimensions : qahirah.Vector, use_xrender : bool) :
         # should I bother with async version, given no actual reply is returned from server?
-        pixmap_id, res = self._easy_create_pixmap(dimensions, use_xrender)
+        pixmap_id, res = self._easy_create_pixmap(depth, dimensions, use_xrender)
         await self.wait_for_reply(res)
         surface = self.conn.easy_create_surface(pixmap_id, dimensions, use_xrender)
         return \
