@@ -1932,7 +1932,7 @@ class Window :
         if (
             any
               (
-                elt == (action, arg)
+                elt[:2] == (action, arg)
                 for i in range(len(self._event_filters))
                 for elt in (self._event_filters[i],)
               )
