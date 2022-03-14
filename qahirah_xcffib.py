@@ -1882,6 +1882,22 @@ class Window :
         self.conn.conn.request_check(res.sequence)
     #end set_mapped
 
+    def set_parent(self, other, pos : Vector) :
+        "does a reparent of this window to the other one."
+        if not isinstance(other, Window) or other.conn != self.conn :
+            raise TypeError("other is not a Window or on a different Connection")
+        #end if
+        pos = Vector.from_tuple(pos)
+        res = self.conn.conn.core.ReparentWindow \
+          (
+            window = self.id,
+            parent = other.id,
+            x = pos.x,
+            y = pos.y
+          )
+        self.conn.conn.request_check(res.sequence)
+    #end set_parent
+
     @classmethod
     def get_window(celf, id) :
         "given an X11 window ID, returns the corresponding Window object." \
