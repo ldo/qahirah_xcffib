@@ -1858,7 +1858,6 @@ class Window :
             self.loop = conn.loop
             self.gcontext = GContext.create(conn, id)
             celf._instances[id] = self
-            self.conn.add_event_filter(self._conn_event_filter, weak_ref(self))
         #end if
         return \
             self
@@ -1866,7 +1865,6 @@ class Window :
 
     def __del__(self) :
         if self.conn != None :
-            self.conn.remove_event_filter(self._conn_event_filter, weak_ref(self), optional = True)
             self.conn = None
             del type(self)._instances[self.id]
         #end if
@@ -1955,6 +1953,9 @@ class Window :
         ) :
             raise KeyError("attempt to install duplicate action+arg")
         #end if
+        if len(self._event_filters) == 0 :
+            self.conn.add_event_filter(self._conn_event_filter, weak_ref(self))
+        #end if
         self._event_filters.append((action, arg, selevents))
     #end add_event_filter
 
@@ -1971,6 +1972,9 @@ class Window :
         assert len(pos) <= 1
         if len(pos) == 1 :
             self._event_filters.pop(pos[0])
+            if len(self._event_filters) == 0 :
+                self.conn.remove_event_filter(self._conn_event_filter, weak_ref(self), optional = True)
+            #end if
         elif not optional :
             raise KeyError("specified action+arg was not installed as an event filter")
         #end if
