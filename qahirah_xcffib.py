@@ -843,9 +843,7 @@ class MaskAttr(enum.IntEnum) :
     " corresponding value, allowing the bit numbers to be in any" \
     " order, the values being automatically sorted into the right" \
     " order as the bit mask is generated from the bit numbers by" \
-    " calling the pack_attributes method.\n" \
-    "\n" \
-    "Subclasses just have to define the bit numbers in increasing order."
+    " calling the pack_attributes method."
 
     @property
     def mask(self) :
