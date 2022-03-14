@@ -1909,7 +1909,7 @@ class Window :
     @staticmethod
     def _conn_event_filter(event, w_self) :
         self = _wderef(w_self, "Window")
-        if isinstance(event, Exception) or hasattr(event, "window") and event.window == self.id :
+        if isinstance(event, Exception) or not hasattr(event, "window") or event.window == self.id :
             event_filters = self._event_filters[:]
               # copy in case actions make changes
             while True :
