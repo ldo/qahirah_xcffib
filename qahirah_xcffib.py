@@ -20,6 +20,8 @@ from weakref import \
 import asyncio
 import atexit
 import qahirah
+from qahirah import \
+    Vector
 import cffi
 import xcffib
 from xcffib import \
@@ -1274,7 +1276,7 @@ class Connection :
         "convenience routine which creates an XCBSurface for drawing" \
         " with Cairo into the specified drawable, with the option of" \
         " using xrender."
-        dimensions = qahirah.Vector.from_tuple(dimensions)
+        dimensions = Vector.from_tuple(dimensions)
         default_screen = self.conn.get_screen_pointers()[0]
         use_root = self.conn.get_setup().roots[0]
         if use_xrender :
@@ -1740,7 +1742,7 @@ class Cursor :
         mask : Pixmap,
         forecolour : Colour,
         backcolour : Colour,
-        hotspot : qahirah.Vector
+        hotspot : Vector
       ) :
         if (
                 not isinstance(conn, Connection)
@@ -1753,7 +1755,7 @@ class Cursor :
             or
                 not isinstance(backcolour, qahirah.Colour)
             or
-                not isinstance(hotspot, qahirah.Vector)
+                not isinstance(hotspot, Vector)
             or
                 not all(isinstance(x, int) and 0 <= x < 65536 for x in tuple(hotspot))
         ) :
@@ -2023,10 +2025,10 @@ class Window :
             self.conn.easy_create_surface(self.id, (10, 10), use_xrender)
     #end easy_create_surface
 
-    def _easy_create_pixmap(self, depth : int, dimensions : qahirah.Vector, use_xrender : bool) :
+    def _easy_create_pixmap(self, depth : int, dimensions : Vector, use_xrender : bool) :
         # common code for both easy_create_pixmap and easy_create_pixmap_async.
         pixmap_id = self.conn.conn.generate_id()
-        dimensions = qahirah.Vector.from_tuple(dimensions)
+        dimensions = Vector.from_tuple(dimensions)
         res = self.conn.conn.core.CreatePixmap \
           (
             pid = pixmap_id,
@@ -2039,7 +2041,7 @@ class Window :
             pixmap_id, res
     #end _easy_create_pixmap
 
-    def easy_create_pixmap(self, depth : int, dimensions : qahirah.Vector, use_xrender : bool) :
+    def easy_create_pixmap(self, depth : int, dimensions : Vector, use_xrender : bool) :
         pixmap_id, res = self._easy_create_pixmap(depth, dimensions, use_xrender)
         self.conn.conn.request_check(res.sequence)
         surface = self.conn.easy_create_surface(pixmap_id, dimensions, use_xrender)
@@ -2047,7 +2049,7 @@ class Window :
             Pixmap(pixmap_id, surface, self)
     #end easy_create_pixmap
 
-    async def easy_create_pixmap_async(self, depth : int, dimensions : qahirah.Vector, use_xrender : bool) :
+    async def easy_create_pixmap_async(self, depth : int, dimensions : Vector, use_xrender : bool) :
         # should I bother with async version, given no actual reply is returned from server?
         pixmap_id, res = self._easy_create_pixmap(depth, dimensions, use_xrender)
         await self.wait_for_reply(res)
@@ -2066,18 +2068,18 @@ class Window :
       (
         self,
         src : Pixmap,
-        src_pos : qahirah.Vector,
-        dst_pos : qahirah.Vector,
-        dimensions : qahirah.Vector
+        src_pos : Vector,
+        dst_pos : Vector,
+        dimensions : Vector
       ) :
         "does a CopyArea call from the specified part of the source" \
         " Pixmap to the specified position within the window."
         if not isinstance(src, Pixmap) :
             raise TypeError("src must be a Pixmap")
         #end if
-        src_pos = qahirah.Vector.from_tuple(src_pos)
-        dst_pos = qahirah.Vector.from_tuple(dst_pos)
-        dimensions = qahirah.Vector.from_tuple(dimensions)
+        src_pos = Vector.from_tuple(src_pos)
+        dst_pos = Vector.from_tuple(dst_pos)
+        dimensions = Vector.from_tuple(dimensions)
         res = self.conn.CopyArea \
           (
             src_drawable = src.id,
@@ -2424,15 +2426,15 @@ class GContext :
         self,
         src_drawable : int,
         dst_drawable : int,
-        src_pos : qahirah.Vector,
-        dst_pos : qahirah.Vector,
-        dimensions : qahirah.Vector
+        src_pos : Vector,
+        dst_pos : Vector,
+        dimensions : Vector
       ) :
         "does a CopyArea call from the specified part of the source" \
         " drawable to the specified position within the destination drawable."
-        src_pos = qahirah.Vector.from_tuple(src_pos)
-        dst_pos = qahirah.Vector.from_tuple(dst_pos)
-        dimensions = qahirah.Vector.from_tuple(dimensions)
+        src_pos = Vector.from_tuple(src_pos)
+        dst_pos = Vector.from_tuple(dst_pos)
+        dimensions = Vector.from_tuple(dimensions)
         res = self.conn.conn.core.CopyArea \
           (
             src_drawable = src_drawable,
@@ -2453,17 +2455,17 @@ class GContext :
         self,
         src_drawable : int,
         dst_drawable : int,
-        src_pos : qahirah.Vector,
-        dst_pos : qahirah.Vector,
-        dimensions : qahirah.Vector,
+        src_pos : Vector,
+        dst_pos : Vector,
+        dimensions : Vector,
         bit_plane : int
       ) :
         "does a CopyPlane call from the specified part and bit plane of the" \
         " source drawable to the specified position within the destination" \
         " drawable."
-        src_pos = qahirah.Vector.from_tuple(src_pos)
-        dst_pos = qahirah.Vector.from_tuple(dst_pos)
-        dimensions = qahirah.Vector.from_tuple(dimensions)
+        src_pos = Vector.from_tuple(src_pos)
+        dst_pos = Vector.from_tuple(dst_pos)
+        dimensions = Vector.from_tuple(dimensions)
         res = self.conn.conn.core.CopyPlane \
           (
             src_drawable = src_drawable,
