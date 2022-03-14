@@ -1950,7 +1950,7 @@ class Window :
             i
             for i in range(len(self._event_filters))
             for elt in (self._event_filters[i],)
-            if elt == (action, arg)
+            if elt[:2] == (action, arg)
           )
         assert len(pos) <= 1
         if len(pos) == 1 :
