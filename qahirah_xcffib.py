@@ -1040,29 +1040,27 @@ class Connection :
             action(self, arg)
         #end if
 
-        if len(self._event_filters) != 0 :
+        while True :
+            if len(self._event_filters) == 0 :
+                break
             try :
                 event = self.conn.poll_for_event()
             except xcffib.XcffibException :
                 event = None
             #end try
-            if event != None :
-                event_filters = self._event_filters[:]
-                  # copy in case actions make changes
-                while True :
-                    try :
-                        action, arg = event_filters.pop(0)
-                    except IndexError :
-                        break
-                    #end try
-                    action(event, arg)
-                #end while
-            else :
-                if self.conn.has_error() :
-                    pass # raise RuntimeError("error on XCB connection")
-                #end if
-            #end if
-        #end if
+            if event == None :
+                break
+            event_filters = self._event_filters[:]
+              # copy in case actions make changes
+            while True :
+                try :
+                    action, arg = event_filters.pop(0)
+                except IndexError :
+                    break
+                #end try
+                action(event, arg)
+            #end while
+        #end while
 
         # always remove, then add back again if needed, to avoid
         # oddities with endless spurious calls
