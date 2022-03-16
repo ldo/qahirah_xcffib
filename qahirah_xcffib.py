@@ -1865,6 +1865,7 @@ class Window :
 
     def __del__(self) :
         if self.conn != None :
+            self.conn.remove_event_filter(self._conn_event_filter, weak_ref(self), optional = True)
             self.conn = None
             del type(self)._instances[self.id]
         #end if
