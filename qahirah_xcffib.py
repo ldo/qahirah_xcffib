@@ -1132,31 +1132,6 @@ class Connection :
         #end if
     #end remove_event_filter
 
-    def wait_for_event(self) :
-        "returns a Future that can be awaited to obtain the next input event." \
-        " Note that, once an event is received, it is delivered to all pending" \
-        " waiters."
-
-        w_self = weak_ref(self)
-        result = self.loop.create_future()
-
-        def event_ready_action(event, result) :
-            self = _wderef(w_self, "Connection")
-            self.remove_event_filter(event_ready_action, result, optional = False)
-            if isinstance(event, Exception) :
-                result.set_exception(event)
-            elif isinstance(event, xcffib.Event) :
-                result.set_result(event)
-            else :
-                raise TypeError("unexpected type of event object %s" % repr(event))
-            #end if
-        #end event_ready_action
-
-    #begin wait_for_event
-        self.add_event_filter(event_ready_action, result)
-        return result
-    #end wait_for_event
-
     def wait_for_reply(self, request_cookie) :
         "returns a Future that can be awaited to return the response from" \
         " an async request. In xcffib, these request calls return (some" \
@@ -2009,29 +1984,6 @@ class Window :
         return \
             self.conn.wait_for_reply(res)
     #end destroy_async
-
-    def wait_for_event(self) :
-        "returns a Future that can be awaited to obtain the next input event for" \
-        " this window. Note that, once an event is received, it is delivered to" \
-        " all pending waiters."
-
-        result = self.loop.create_future()
-
-        def event_ready_action(self, event, result) :
-            self.remove_event_filter(event_ready_action, result, optional = False)
-            if isinstance(event, Exception) :
-                result.set_exception(event)
-            elif isinstance(event, xcffib.Event) :
-                result.set_result(event)
-            else :
-                raise TypeError("unexpected type of event object %s" % repr(event))
-            #end if
-        #end event_ready_action
-
-    #begin wait_for_event
-        self.add_event_filter(event_ready_action, result)
-        return result
-    #end wait_for_event
 
     def easy_create_surface(self, use_xrender : bool) :
         "convenience routine which creates an XCBSurface for drawing" \
