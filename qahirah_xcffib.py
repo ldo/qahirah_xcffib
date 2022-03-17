@@ -21,7 +21,8 @@ import asyncio
 import atexit
 import qahirah
 from qahirah import \
-    Vector
+    Vector, \
+    Rect
 import cffi
 import xcffib
 from xcffib import \
@@ -1191,7 +1192,7 @@ class Connection :
         return result
     #end wait_for_reply
 
-    def _easy_create_window(self, bounds : qahirah.Rect, border_width : int, set_attrs) :
+    def _easy_create_window(self, bounds : Rect, border_width : int, set_attrs) :
         # common code for both easy_create_window and easy_create_window_async.
         default_screen = self.conn.get_screen_pointers()[0]
         use_root = self.conn.get_setup().roots[0]
@@ -1224,7 +1225,7 @@ class Connection :
             window, res
     #end _easy_create_window
 
-    def easy_create_window(self, bounds : qahirah.Rect, border_width : int, set_attrs) :
+    def easy_create_window(self, bounds : Rect, border_width : int, set_attrs) :
         "convenience wrapper which handles a lot of the seeming repetitive tasks" \
         " associated with window creation. set_attrs is a sequence of" \
         " («bit_nr», «value») pairs where each bit_nr is a member of the WINATTR" \
@@ -1237,7 +1238,7 @@ class Connection :
             window
     #end easy_create_window
 
-    async def easy_create_window_async(self, bounds : qahirah.Rect, border_width : int, set_attrs) :
+    async def easy_create_window_async(self, bounds : Rect, border_width : int, set_attrs) :
         "async version of easy_create_window convenience wrapper."
         window, res = self._easy_create_window(bounds, border_width, set_attrs)
         await self.wait_for_reply(res)
@@ -1980,7 +1981,7 @@ class Window :
     #end remove_event_filter
 
     @classmethod
-    def easy_create(celf, conn, bounds : qahirah.Rect, border_width : int, set_attrs) :
+    def easy_create(celf, conn, bounds : Rect, border_width : int, set_attrs) :
         if not isinstance(conn, Connection) :
             raise TypeError("conn must be a Connection")
         #end if
@@ -1990,7 +1991,7 @@ class Window :
     #end easy_create
 
     @classmethod
-    async def easy_create_async(celf, conn, bounds : qahirah.Rect, border_width : int, set_attrs) :
+    async def easy_create_async(celf, conn, bounds : Rect, border_width : int, set_attrs) :
         if not isinstance(conn, Connection) :
             raise TypeError("conn must be a Connection")
         #end if
@@ -2054,9 +2055,9 @@ class Window :
             Pixmap(pixmap_id, surface, self)
     #end easy_create_pixmap
 
-    def invalidate(self, area : qahirah.Rect = None) :
+    def invalidate(self, area : Rect = None) :
         if area == None :
-            area = qahirah.Rect(0, 0, 0, 0) # does actual area matter?
+            area = Rect(0, 0, 0, 0) # does actual area matter?
         #end if
         res = self.conn.conn.core.SendEvent \
           (
@@ -2077,7 +2078,7 @@ class Window :
         self.conn.conn.request_check(res.sequence)
     #end invalidate
 
-    def clear_area(self, bounds : qahirah.Rect, exposures : bool) :
+    def clear_area(self, bounds : Rect, exposures : bool) :
         "does a ClearArea call on the specified area of the window."
         res = self.conn.ClearArea(exposures, bounds.x, bounds.y, bounds.width, bounds.height)
         self.conn.request_check(res.sequence)
