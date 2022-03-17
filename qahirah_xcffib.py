@@ -2029,6 +2029,29 @@ class Window :
             Pixmap(pixmap_id, surface, self)
     #end easy_create_pixmap
 
+    def invalidate(self, area : qahirah.Rect = None) :
+        if area == None :
+            area = qahirah.Rect(0, 0, 0, 0) # does actual area matter?
+        #end if
+        res = self.conn.conn.core.SendEvent \
+          (
+            propagate = False,
+            destination = self.id,
+            event_mask = 0,
+            event =
+                xproto.ExposeEvent.synthetic
+                  (
+                    window = self.id,
+                    x = area.left,
+                    y = area.top,
+                    width = area.width,
+                    height = area.height,
+                    count = 0
+                  ).pack()
+          )
+        self.conn.conn.request_check(res.sequence)
+    #end invalidate
+
     def clear_area(self, bounds : qahirah.Rect, exposures : bool) :
         "does a ClearArea call on the specified area of the window."
         res = self.conn.ClearArea(exposures, bounds.x, bounds.y, bounds.width, bounds.height)
