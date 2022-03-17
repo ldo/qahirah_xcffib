@@ -1810,6 +1810,8 @@ class Window :
             "gcontext",
             "user_data", # dict, initially empty, may be used by caller for any purpose
             "_event_filters",
+            "_parent",
+            "_children",
         ) # to forestall typos
 
     _instances = WeakValueDictionary()
@@ -1828,6 +1830,8 @@ class Window :
             #end if
             self.user_data = user_data
             self._event_filters = []
+            self._parent = None
+            self._children = set()
             self.loop = conn.loop
             self.gcontext = GContext.create(conn, id)
             celf._instances[id] = self
@@ -1859,6 +1863,11 @@ class Window :
         if not isinstance(other, Window) or other.conn != self.conn :
             raise TypeError("other is not a Window or on a different Connection")
         #end if
+        if self._parent != None :
+            self.get_window(self._parent)._children.discard(self.id)
+        #end if
+        other._children.add(self.id)
+        self._parent = other.id
         pos = Vector.from_tuple(pos)
         res = self.conn.conn.core.ReparentWindow \
           (
@@ -1881,7 +1890,17 @@ class Window :
     @staticmethod
     def _conn_event_filter(event, w_self) :
         self = _wderef(w_self, "Window")
-        if isinstance(event, Exception) or not hasattr(event, "window") or event.window == self.id :
+        if isinstance(event, xcffib.Event) :
+            event_window = set \
+              (
+                getattr(event, e)
+                for e in ("child", "event", "window")
+                if hasattr(event, e)
+              )
+        else :
+            event_window = set()
+        #end if
+        if len(event_window) == 0 or self.id in event_window :
             event_filters = self._event_filters[:]
               # copy in case actions make changes
             while True :
@@ -1900,6 +1919,12 @@ class Window :
                     action(self, event, arg)
                 #end if
             #end while
+        #end if
+        if len(event_window) != 0 :
+            for child in self._children :
+                child = self.get_window(child)
+                child._conn_event_filter(event, weak_ref(child))
+            #end if
         #end if
     #end _conn_event_filter
 
