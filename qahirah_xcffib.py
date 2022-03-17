@@ -2075,7 +2075,7 @@ class Window :
                     count = 0
                   ).pack()
           )
-        self.conn.conn.request_check(res.sequence)
+        #self.conn.conn.request_check(res.sequence) # seems to work better without this
     #end invalidate
 
     def clear_area(self, bounds : Rect, exposures : bool) :
