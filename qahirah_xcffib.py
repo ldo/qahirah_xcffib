@@ -968,6 +968,19 @@ class GCATTR(MaskAttr) :
 
 #end GCATTR
 
+class CONFIGWINDOW(MaskAttr) :
+    "bit numbers corresponding to bit masks for attributes to" \
+    " ConfigWindow call."
+    X = 0
+    Y = 1
+    WIDTH = 2
+    HEIGHT = 3
+    BORDERWIDTH = 4
+    SIBLING = 5
+    STACKMODE = 6
+
+#end CONFIGWINDOW
+
 class Connection :
     "wraps an XCB connection to the X server. You can instantiate directly," \
     " passing the result from xcffib.Connection(), or you can use the open()" \
@@ -2035,6 +2048,28 @@ class Window :
         return \
             self.conn.wait_for_reply(res)
     #end destroy_async
+
+    def get_geometry(self) :
+        res = self.conn.conn.core.GetGeometry(self.id)
+        result = res.reply()
+        result.bounds = Rect(result.x, result.y, result.width, result.height)
+        return \
+            result
+    #end get_geometry
+
+    async def get_geometry_async(self) :
+        res = self.conn.conn.core.GetGeometry(self.id)
+        result = await self.conn.wait_for_reply(res)
+        result.bounds = Rect(result.x, result.y, result.width, result.height)
+        return \
+            result
+    #end get_geometry_async
+
+    def configure(self, config_attrs) :
+        value_mask, value_list = CONFIGWINDOW.pack_attributes(config_attrs)
+        res = self.conn.conn.core.ConfigureWindow(self.id, value_mask, value_list)
+        self.conn.conn.request_check(res.sequence)
+    #end configure
 
     def easy_create_surface(self, use_xrender : bool) :
         "convenience routine which creates an XCBSurface for drawing" \
