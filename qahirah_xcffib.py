@@ -1679,19 +1679,19 @@ class Pixmap :
     "wraps a Pixmap, with an associated surface already created for Cairo drawing." \
     " Do not instantiate directly; get from Window.easy_create_pixmap()."
 
-    def __init__(self, id, surface, parent) :
+    def __init__(self, id, surface, conn) :
         self.id = id
         self.surface = surface
-        self.parent = parent
+        self.conn = conn
     #end __init__
 
     def destroy(self) :
         if self.id != None :
             self.surface = None
-            res = self.parent.conn.core.FreePixmap(self.id)
-            self.parent.conn.request_check(res.sequence)
+            res = self.conn.conn.core.FreePixmap(self.id)
+            self.conn.conn.request_check(res.sequence)
             self.id = None
-            self.parent = None
+            self.conn = None
         #end if
     #end destroy
 
@@ -2052,7 +2052,7 @@ class Window :
         self.conn.conn.request_check(res.sequence)
         surface = self.conn.easy_create_surface(pixmap_id, dimensions, use_xrender)
         return \
-            Pixmap(pixmap_id, surface, self)
+            Pixmap(pixmap_id, surface, self.conn)
     #end easy_create_pixmap
 
     async def easy_create_pixmap_async(self, depth : int, dimensions : Vector, use_xrender : bool) :
@@ -2061,7 +2061,7 @@ class Window :
         await self.wait_for_reply(res)
         surface = self.conn.easy_create_surface(pixmap_id, dimensions, use_xrender)
         return \
-            Pixmap(pixmap_id, surface, self)
+            Pixmap(pixmap_id, surface, self.conn)
     #end easy_create_pixmap
 
     def invalidate(self, area : Rect = None) :
