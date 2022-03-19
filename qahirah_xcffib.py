@@ -1000,6 +1000,7 @@ class Connection :
             "atom_cache",
             "user_data",
             "_conn_fd",
+            "_ext_inited",
             "_event_filters",
             "_reply_queue",
             "last_sequence",
@@ -1009,6 +1010,20 @@ class Connection :
       # hopefully sequence numbers should never jump by this much at once
 
     def __init__(self, conn, loop = None) :
+
+        def def_query_version(key, methname, args) :
+
+            def do_query(self) :
+                res = getattr(self.conn(key), methname)(*args)
+                reply = res.reply()
+            #end do_query
+
+        #begin def_query_version
+            return \
+                do_query
+        #end def_query_version
+
+    #begin __init__
         _get_conn(conn) # just a sanity check
         if loop == None :
             loop = get_event_loop()
@@ -1020,6 +1035,20 @@ class Connection :
         self._conn_fd = conn.get_file_descriptor()
           # keep my own copy because conn.get_file_descriptor()
           # could return an error later
+        self._ext_inited = \
+            {
+                xrender.key :
+                    {
+                        "query" :
+                            def_query_version
+                              (
+                                key = xrender.key,
+                                methname = "QueryVersion",
+                                args = (xrender.MAJOR_VERSION, xrender.MINOR_VERSION)
+                              ),
+                        "done" : False,
+                    }
+            }
         self._event_filters = []
         self._reply_queue = []
           # wait queue for replies to requests
@@ -1045,6 +1074,22 @@ class Connection :
             self.conn = None
         #end if
     #end close
+
+    def init_ext(self, key) :
+        if key not in self._ext_inited :
+            raise KeyError \
+              (
+                    "unknown extension %s"
+                %
+                    (lambda : repr(key), lambda : key.name)[hasattr(key, "name")]()
+              )
+        #end if
+        entry = self._ext_inited[key]
+        if not entry["done"] :
+            entry["query"](self)
+            entry["done"] = True
+        #end if
+    #end init_ext
 
     @staticmethod
     def _handle_conn_readable(w_self) :
@@ -1298,6 +1343,7 @@ class Connection :
         default_screen = self.conn.get_screen_pointers()[0]
         use_root = self.conn.get_setup().roots[0]
         if use_xrender :
+            self.init_ext(xrender.key)
             conn_xrender = self.conn(xrender.key)
             res = conn_xrender.QueryPictFormats()
             reply = res.reply() # could offer async alternative here
