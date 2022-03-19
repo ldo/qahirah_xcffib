@@ -1012,10 +1012,10 @@ class Connection :
 
     def __init__(self, conn, loop = None) :
 
-        def def_query_version(key, methname, args) :
+        def def_query_version(key, args) :
 
             def do_query(self) :
-                res = getattr(self.conn(key), methname)(*args)
+                res = getattr(self.conn(key), "QueryVersion")(*args)
                 reply = res.reply()
             #end do_query
 
@@ -1036,31 +1036,15 @@ class Connection :
         self._conn_fd = conn.get_file_descriptor()
           # keep my own copy because conn.get_file_descriptor()
           # could return an error later
-        self._ext_inited = \
-            {
-                xfixes.key :
-                    {
-                        "query" :
-                            def_query_version
-                              (
-                                key = xfixes.key,
-                                methname = "QueryVersion",
-                                args = (xfixes.MAJOR_VERSION, xfixes.MINOR_VERSION)
-                              ),
-                        "done" : False,
-                    },
-                xrender.key :
-                    {
-                        "query" :
-                            def_query_version
-                              (
-                                key = xrender.key,
-                                methname = "QueryVersion",
-                                args = (xrender.MAJOR_VERSION, xrender.MINOR_VERSION)
-                              ),
-                        "done" : False,
-                    }
-            }
+        self._ext_inited = dict \
+          (
+            (key, {"query" : def_query_version(key, args), "done" : False})
+            for key, args in
+                (
+                    (xfixes.key, (xfixes.MAJOR_VERSION, xfixes.MINOR_VERSION)),
+                    (xrender.key, (xrender.MAJOR_VERSION, xrender.MINOR_VERSION)),
+                )
+          )
         self._event_filters = []
         self._reply_queue = []
           # wait queue for replies to requests
