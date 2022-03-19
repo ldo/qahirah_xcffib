@@ -28,7 +28,8 @@ import xcffib
 from xcffib import \
     xproto, \
     xfixes, \
-    render as xrender
+    render as xrender, \
+    shape as xshape
 
 #+
 # Useful stuff
@@ -1043,6 +1044,7 @@ class Connection :
                 (
                     (xfixes.key, (xfixes.MAJOR_VERSION, xfixes.MINOR_VERSION)),
                     (xrender.key, (xrender.MAJOR_VERSION, xrender.MINOR_VERSION)),
+                    (xshape.key, ()),
                 )
           )
         self._event_filters = []
@@ -2119,7 +2121,23 @@ class Window :
         self.conn.conn.request_check(res.sequence)
     #end configure
 
-    # TODO: SetWindowShapeRegion
+    def set_shape_region(self, kind, offset : Vector, shape) :
+        offset = Vector.from_tuple(offset)
+        if not isinstance(shape, Region) :
+            raise TypeError("shape must be a Region")
+        #end if
+        self.conn.init_ext(xfixes.key)
+        self.conn.init_ext(xshape.key) # ?
+        res = self.conn.conn(xfixes.key).SetWindowShapeRegion \
+          (
+            dest = self.id,
+            dest_kind = kind,
+            x_offset = offset.x,
+            y_offset = offset.y,
+            region = shape.id
+          )
+        self.conn.conn.request_check(res.sequence)
+    #end set_shape_region
 
     def easy_create_surface(self, use_xrender : bool) :
         "convenience routine which creates an XCBSurface for drawing" \
