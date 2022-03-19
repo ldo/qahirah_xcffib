@@ -2666,7 +2666,26 @@ class Region :
             celf(conn, id)
     #end create
 
-    # TODO: create from bitmap, create from window, create from GC,
+    @classmethod
+    def create_from_bitmap(celf, conn : Connection, pix : Pixmap) :
+        if not isinstance(conn, Connection) :
+            raise TypeError("conn must be a Connection")
+        #end if
+        if not isinstance(pix, Pixmap) :
+            raise TypeError("pix must be a Pixmap")
+        #end if
+        if pix.conn != conn :
+            raise ValueError("pix was not created on this Connection")
+        #end if
+        conn.init_ext(xfixes.key)
+        id = conn.conn.generate_id()
+        res = conn.conn(xfixes.key).CreateRegionFromBitmap(id, pix.id)
+        conn.conn.request_check(res.sequence)
+        return \
+            celf(conn, id)
+    #end create_from_bitmap
+
+    # TODO: create from window, create from GC,
     # SetRegion, CopyRegion, UnionRegion, IntersectRection, SubtractRegion,
     # InvertRegion, TranslateRegion, RegionExtents, ExpandRegion
 
