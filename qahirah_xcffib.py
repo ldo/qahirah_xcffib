@@ -2624,7 +2624,6 @@ class Region :
         ) # to forestall typos
 
     _instances = WeakValueDictionary()
-    _ext_inited = False # FIXME: should be Connection-specific setting
 
     def __new__(celf, conn, id) :
         self = celf._instances.get(id)
