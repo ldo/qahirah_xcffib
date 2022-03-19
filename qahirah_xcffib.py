@@ -27,6 +27,7 @@ import cffi
 import xcffib
 from xcffib import \
     xproto, \
+    xfixes, \
     render as xrender
 
 #+
@@ -1037,6 +1038,17 @@ class Connection :
           # could return an error later
         self._ext_inited = \
             {
+                xfixes.key :
+                    {
+                        "query" :
+                            def_query_version
+                              (
+                                key = xfixes.key,
+                                methname = "QueryVersion",
+                                args = (xfixes.MAJOR_VERSION, xfixes.MINOR_VERSION)
+                              ),
+                        "done" : False,
+                    },
                 xrender.key :
                     {
                         "query" :
@@ -2123,6 +2135,8 @@ class Window :
         self.conn.conn.request_check(res.sequence)
     #end configure
 
+    # TODO: SetWindowShapeRegion
+
     def easy_create_surface(self, use_xrender : bool) :
         "convenience routine which creates an XCBSurface for drawing" \
         " with Cairo into this window, with the option of using xrender.\n" \
@@ -2600,13 +2614,122 @@ class GContext :
 
 #end GContext
 
+class Region :
+
+    __slots__ = \
+        (
+            "__weakref__",
+            "conn",
+            "id",
+        ) # to forestall typos
+
+    _instances = WeakValueDictionary()
+    _ext_inited = False # FIXME: should be Connection-specific setting
+
+    def __new__(celf, conn, id) :
+        self = celf._instances.get(id)
+        if self == None :
+            self = super().__new__(celf)
+            self.conn = conn
+            self.id = id
+            celf._instances[id] = self
+        #end if
+        return \
+            self
+    #end __new__
+
+    @staticmethod
+    def _rects_to_x11(rects) :
+        if (
+                not isinstance(rects, (tuple, list))
+            or
+                not all(isinstance(r, Rect) for r in rects)
+        ) :
+            raise TypeError("rects is not a sequence of qahirah.Rect")
+        #end if
+        result = []
+        for r in rects :
+            r.assert_isint()
+            result.append \
+              (
+                xproto.RECTANGLE.synthetic(r.left, r.top, r.width, r.height)
+              )
+        #end for
+        return \
+            len(result), result
+    #end _rects_to_x11
+
+    @staticmethod
+    def _rects_from_x11(rects) :
+        return \
+            list \
+              (
+                Rect(r.x, r.y, r.width, r.height)
+                for r in rects
+              )
+    #end _rects_from_x11
+
+    @classmethod
+    def create(celf, conn : Connection, rects) :
+        if not isinstance(conn, Connection) :
+            raise TypeError("conn must be a Connection")
+        #end if
+        conn.init_ext(xfixes.key)
+        nr_rects, rects = celf._rects_to_x11(rects)
+        id = conn.conn.generate_id()
+        res = conn.conn(xfixes.key).CreateRegion(id, nr_rects, rects)
+        conn.conn.request_check(res.sequence)
+        return \
+            celf(conn, id)
+    #end create
+
+    # TODO: create from bitmap, create from window, create from GC,
+    # SetRegion, CopyRegion, UnionRegion, IntersectRection, SubtractRegion,
+    # InvertRegion, TranslateRegion, RegionExtents, ExpandRegion
+
+    def fetch(self) :
+        res = self.conn.conn(xfixes.key).FetchRegion(self.id)
+        reply = res.reply()
+        return \
+          (
+            Rect(reply.extents.x, reply.extents.y, reply.extents.width, reply.extents.height),
+            self._rects_from_x11(reply.rectangles)
+          )
+    #end fetch
+
+    async def fetch_async(self) :
+        res = self.conn.conn(xfixes.key).FetchRegion(self.id)
+        reply = await self.conn.wait_for_reply(res)
+        return \
+            self._rects_from_x11(reply.rectangles)
+    #end fetch_async
+
+    def destroy(self) :
+        if self.conn != None :
+            if self.id != None :
+                res = self.conn.conn(xfixes.key).DestroyRegion(self.id)
+                self.conn.conn.request_check(res.sequence)
+                self.id = None
+            #end if
+            self.conn = None
+        #end if
+    #end destroy
+
+    def __del__(self) :
+        self.destroy()
+    #end __del__
+
+    # more TBD
+
+#end Region
+
 #+
 # Cleanup
 #-
 
 def _atexit() :
     # disable all __del__ methods at process termination to avoid segfaults
-    for cłass in (Window, Pixmap, Cursor, GContext) :
+    for cłass in (Window, Pixmap, Cursor, GContext, Region) :
         delattr(cłass, "__del__")
     #end for
 #end _atexit
