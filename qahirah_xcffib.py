@@ -856,10 +856,16 @@ class MaskAttr(enum.IntEnum) :
 
     @classmethod
     def pack_attributes(celf, attrs, default_attrs = None) :
-        "converts attributes from my sequence-of-key+value form" \
+        "converts attributes from my sequence/dict-of-key+value form" \
         " to the mask+ordered-value-list form that X11 expects. If not" \
         " None, default_attrs is used to fill in defaults not specified" \
         " in attrs."
+        if isinstance(attrs, dict) :
+            attrs = tuple(attrs.items())
+        #end if
+        if isinstance(default_attrs, dict) :
+            default_attrs = tuple(default_attrs.items())
+        #end if
         if (
                 not all
                   (
