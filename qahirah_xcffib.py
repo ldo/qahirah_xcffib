@@ -1271,8 +1271,8 @@ class Connection :
     #end _easy_create_pixmap
 
     def easy_create_root_pixmap(self, depth : int, dimensions : Vector, use_xrender : bool) :
-        default_screen = self.conn.get_screen_pointers()[0]
-        pixmap_id, res = self._easy_create_pixmap(default_screen.root, depth, dimensions)
+        use_root = self.conn.setup.roots[0]
+        pixmap_id, res = self._easy_create_pixmap(use_root.root, depth, dimensions)
         self.conn.request_check(res.sequence)
         surface = self.easy_create_surface(pixmap_id, dimensions, use_xrender)
         return \
@@ -1281,8 +1281,7 @@ class Connection :
 
     def _easy_create_window(self, bounds : Rect, border_width : int, set_attrs) :
         # common code for both easy_create_window and easy_create_window_async.
-        default_screen = self.conn.get_screen_pointers()[0]
-        use_root = self.conn.get_setup().roots[0]
+        use_root = self.conn.setup.roots[0]
         window = self.conn.generate_id()
         value_mask, value_list = WINATTR.pack_attributes \
           (
@@ -1297,7 +1296,7 @@ class Connection :
           (
             depth = xcffib.XCB_COPY_FROM_PARENT,
             wid = window,
-            parent = default_screen.root,
+            parent = use_root.root,
             x = bounds.left,
             y = bounds.top,
             width = bounds.width,
@@ -1338,9 +1337,8 @@ class Connection :
         " with Cairo into the specified drawable, with the option of" \
         " using xrender."
         dimensions = Vector.from_tuple(dimensions)
-        default_screen = self.conn.get_screen_pointers()[0]
-        use_root = self.conn.get_setup().roots[0]
         if use_xrender :
+            default_screen = self.conn.get_screen_pointers()[0]
             self.init_ext(xrender.key)
             conn_xrender = self.conn(xrender.key)
             res = conn_xrender.QueryPictFormats()
@@ -1371,6 +1369,7 @@ class Connection :
                 height = dimensions.y
               )
         else :
+            use_root = self.conn.setup.roots[0]
             use_visuals = list \
               (
                 vis
