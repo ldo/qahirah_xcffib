@@ -2140,15 +2140,11 @@ class Window :
         self.conn.conn.request_check(res.sequence)
     #end set_shape_region
 
-    def easy_create_surface(self, use_xrender : bool) :
+    def easy_create_surface(self, dimensions : Vector, use_xrender : bool) :
         "convenience routine which creates an XCBSurface for drawing" \
-        " with Cairo into this window, with the option of using xrender.\n" \
-        "\n" \
-        "Note that the surface is initially created with dummy dimensions;" \
-        " these will need to be fixed up with a set_size() call when you" \
-        " receive a ConfigureNotifyEvent for the window."
+        " with Cairo into this window, with the option of using xrender."
         return \
-            self.conn.easy_create_surface(self.id, (10, 10), use_xrender)
+            self.conn.easy_create_surface(self.id, dimensions, use_xrender)
     #end easy_create_surface
 
     def easy_create_pixmap(self, depth : int, dimensions : Vector, use_xrender : bool) :
