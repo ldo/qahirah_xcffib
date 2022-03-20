@@ -1338,7 +1338,7 @@ class Connection :
         " using xrender."
         dimensions = Vector.from_tuple(dimensions)
         if use_xrender :
-            default_screen = self.conn.get_screen_pointers()[0]
+            use_screen = self.conn.get_screen_pointers()[0]
             self.init_ext(xrender.key)
             conn_xrender = self.conn(xrender.key)
             res = conn_xrender.QueryPictFormats()
@@ -1362,7 +1362,7 @@ class Connection :
             surface = XCBSurface.create_with_xrender_format \
               (
                 connection = self.conn,
-                screen = default_screen,
+                screen = use_screen,
                 drawable = drawable,
                 format = use_pictformats[0],
                 width = dimensions.x,
