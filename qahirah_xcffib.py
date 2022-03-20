@@ -976,7 +976,7 @@ class GCATTR(MaskAttr) :
 
 #end GCATTR
 
-class CONFIGWINDOW(MaskAttr) :
+class WINCONFIG(MaskAttr) :
     "bit numbers corresponding to bit masks for attributes to" \
     " ConfigWindow call."
     X = 0
@@ -987,7 +987,7 @@ class CONFIGWINDOW(MaskAttr) :
     SIBLING = 5
     STACKMODE = 6
 
-#end CONFIGWINDOW
+#end WINCONFIG
 
 class Connection :
     "wraps an XCB connection to the X server. You can instantiate directly," \
@@ -2118,7 +2118,7 @@ class Window :
     #end get_geometry_async
 
     def configure(self, config_attrs) :
-        value_mask, value_list = CONFIGWINDOW.pack_attributes(config_attrs)
+        value_mask, value_list = WINCONFIG.pack_attributes(config_attrs)
         res = self.conn.conn.core.ConfigureWindow(self.id, value_mask, value_list)
         self.conn.conn.request_check(res.sequence)
     #end configure
