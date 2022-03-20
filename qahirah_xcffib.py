@@ -1978,41 +1978,43 @@ class Window :
 
     @staticmethod
     def _conn_event_filter(event, w_self) :
-        self = _wderef(w_self, "Window")
-        if isinstance(event, xcffib.Event) :
-            event_window = set \
-              (
-                getattr(event, e)
-                for e in ("child", "event", "window")
-                if hasattr(event, e)
-              )
-        else :
-            event_window = set()
-        #end if
-        if len(event_window) == 0 or self.id in event_window :
-            event_filters = self._event_filters[:]
-              # copy in case actions make changes
-            while True :
-                try :
-                    action, args, selevents = event_filters.pop(0)
-                except IndexError :
-                    break
-                #end try
-                if selevents != None and hasattr(event, "response_type") :
-                    response_type = event.response_type & 127
-                      # strip off synthetic bit
-                else :
-                    response_type = None
+        self = w_self()
+        if self != None :
+            if isinstance(event, xcffib.Event) :
+                event_window = set \
+                  (
+                    getattr(event, e)
+                    for e in ("child", "event", "window")
+                    if hasattr(event, e)
+                  )
+            else :
+                event_window = set()
+            #end if
+            if len(event_window) == 0 or self.id in event_window :
+                event_filters = self._event_filters[:]
+                  # copy in case actions make changes
+                while True :
+                    try :
+                        action, args, selevents = event_filters.pop(0)
+                    except IndexError :
+                        break
+                    #end try
+                    if selevents != None and hasattr(event, "response_type") :
+                        response_type = event.response_type & 127
+                          # strip off synthetic bit
+                    else :
+                        response_type = None
+                    #end if
+                    if selevents == None or response_type in selevents :
+                        action(self, event, *args)
+                    #end if
+                #end while
+            #end if
+            if len(event_window) != 0 :
+                for child in self._children :
+                    child = self.get_window(child)
+                    child._conn_event_filter(event, weak_ref(child))
                 #end if
-                if selevents == None or response_type in selevents :
-                    action(self, event, *args)
-                #end if
-            #end while
-        #end if
-        if len(event_window) != 0 :
-            for child in self._children :
-                child = self.get_window(child)
-                child._conn_event_filter(event, weak_ref(child))
             #end if
         #end if
     #end _conn_event_filter
