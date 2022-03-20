@@ -1099,8 +1099,8 @@ class Connection :
         # otherwise these could be held up indefinitely by a
         # never-ending stream of events
         if len(self._reply_queue) != 0 :
-            action, arg = self._reply_queue.pop(0)
-            action(self, arg)
+            action, args = self._reply_queue.pop(0)
+            action(self, *args)
         #end if
 
         while True :
@@ -1117,11 +1117,11 @@ class Connection :
               # copy in case actions make changes
             while True :
                 try :
-                    action, arg = event_filters.pop(0)
+                    action, args = event_filters.pop(0)
                 except IndexError :
                     break
                 #end try
-                action(event, arg)
+                action(event, *args)
             #end while
         #end while
 
@@ -1142,27 +1142,27 @@ class Connection :
             #end if
         else :
             assert conn_err != None
-            for action, arg in self._event_filters[:] :
+            for action, args in self._event_filters[:] :
               # copy in case actions make changes
-                action(conn_err, arg)
+                action(conn_err, *args)
             #end for
         #end if
     #end _handle_conn_readable
 
-    def add_event_filter(self, action, arg) :
+    def add_event_filter(self, action, args = ()) :
         "installs a filter which gets to see all incoming events. It is invoked" \
-        " as “action(event, arg)“ where the meaning of arg is up to you."
+        " as “action(event, *args)“ where the meaning of args is up to you."
         if (
             any
               (
-                elt == (action, arg)
+                elt == (action, args)
                 for i in range(len(self._event_filters))
                 for elt in (self._event_filters[i],)
               )
         ) :
-            raise KeyError("attempt to install duplicate action+arg")
+            raise KeyError("attempt to install duplicate action+args")
         #end if
-        newelt = (action, arg)
+        newelt = (action, args)
         if len(self._event_filters) + len(self._reply_queue) == 0 :
             self.loop.add_reader \
               (
@@ -1174,7 +1174,7 @@ class Connection :
         self._event_filters.append(newelt)
     #end add_event_filter
 
-    def remove_event_filter(self, action, arg, optional : bool) :
+    def remove_event_filter(self, action, args = (), *, optional : bool) :
         "removes a previously-installed event filter. optional indicates" \
         " not to report an error if no such filter is installed."
         pos = list \
@@ -1182,7 +1182,7 @@ class Connection :
             i
             for i in range(len(self._event_filters))
             for elt in (self._event_filters[i],)
-            if elt == (action, arg)
+            if elt == (action, args)
           )
         assert len(pos) <= 1
         if len(pos) == 1 :
@@ -1191,7 +1191,7 @@ class Connection :
                 self.loop.remove_reader(self._conn_fd)
             #end if
         elif not optional :
-            raise KeyError("specified action+arg was not installed as an event filter")
+            raise KeyError("specified action+args was not installed as an event filter")
         #end if
     #end remove_event_filter
 
@@ -1240,7 +1240,7 @@ class Connection :
             # reply should already be available
             reply_ready_action(self, result)
         else :
-            newelt = (reply_ready_action, result)
+            newelt = (reply_ready_action, (result,))
             if len(self._event_filters) + len(self._reply_queue) == 0 :
                 self.loop.add_reader \
                   (
@@ -1994,7 +1994,7 @@ class Window :
               # copy in case actions make changes
             while True :
                 try :
-                    action, arg, selevents = event_filters.pop(0)
+                    action, args, selevents = event_filters.pop(0)
                 except IndexError :
                     break
                 #end try
@@ -2005,7 +2005,7 @@ class Window :
                     response_type = None
                 #end if
                 if selevents == None or response_type in selevents :
-                    action(self, event, arg)
+                    action(self, event, *args)
                 #end if
             #end while
         #end if
@@ -2017,12 +2017,12 @@ class Window :
         #end if
     #end _conn_event_filter
 
-    def add_event_filter(self, action, arg, selevents = None) :
+    def add_event_filter(self, action, args = (), selevents = None) :
         "installs a filter which gets to see the specified incoming events (or all" \
         " events if not specified) for this window. It is invoked as" \
-        " “action(window, event, arg)” where the meaning of arg is up to you." \
+        " “action(window, event, *args)” where the meaning of args is up to you." \
         "\n" \
-        "Only one instance of any action+arg combination is allowed to be" \
+        "Only one instance of any action+args combination is allowed to be" \
         " installed at a time."
         if (
                 selevents != None
@@ -2034,20 +2034,20 @@ class Window :
         if (
             any
               (
-                elt[:2] == (action, arg)
+                elt[:2] == (action, args)
                 for i in range(len(self._event_filters))
                 for elt in (self._event_filters[i],)
               )
         ) :
-            raise KeyError("attempt to install duplicate action+arg")
+            raise KeyError("attempt to install duplicate action+args")
         #end if
         if len(self._event_filters) == 0 :
-            self.conn.add_event_filter(self._conn_event_filter, weak_ref(self))
+            self.conn.add_event_filter(self._conn_event_filter, (weak_ref(self),))
         #end if
-        self._event_filters.append((action, arg, selevents))
+        self._event_filters.append((action, args, selevents))
     #end add_event_filter
 
-    def remove_event_filter(self, action, arg, optional : bool) :
+    def remove_event_filter(self, action, args = (), *, optional : bool) :
         "removes a previously-installed event filter. optional indicates" \
         " not to report an error if no such filter is installed."
         pos = list \
@@ -2055,16 +2055,16 @@ class Window :
             i
             for i in range(len(self._event_filters))
             for elt in (self._event_filters[i],)
-            if elt[:2] == (action, arg)
+            if elt[:2] == (action, args)
           )
         assert len(pos) <= 1
         if len(pos) == 1 :
             self._event_filters.pop(pos[0])
             if len(self._event_filters) == 0 :
-                self.conn.remove_event_filter(self._conn_event_filter, weak_ref(self), optional = True)
+                self.conn.remove_event_filter(self._conn_event_filter, (weak_ref(self),), optional = True)
             #end if
         elif not optional :
-            raise KeyError("specified action+arg was not installed as an event filter")
+            raise KeyError("specified action+args was not installed as an event filter")
         #end if
     #end remove_event_filter
 
