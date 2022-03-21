@@ -1074,6 +1074,9 @@ class Connection :
     #end close
 
     def init_ext(self, key) :
+        "initializes the specified extension for use on this Connection, if not" \
+        " already done. key is one of the xcffib.«module».key values identifying" \
+        " the extension. Only a limited subset of these is recognized for now."
         if key not in self._ext_inited :
             raise KeyError \
               (
