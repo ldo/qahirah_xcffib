@@ -1257,8 +1257,14 @@ class Connection :
         return result
     #end wait_for_reply
 
-    def _easy_create_pixmap(self, drawable : int, depth : int, dimensions : Vector) :
-        # common code for easy_create_pixmap routines.
+    def root_window(self, rootnr) :
+        "returns a Window object representing the root window."
+        return \
+            Window.root_window(self, rootnr)
+    #end root_window
+
+    def _create_pixmap(self, drawable : int, depth : int, dimensions : Vector) :
+        # common code for create_pixmap routines.
         pixmap_id = self.conn.generate_id()
         dimensions = Vector.from_tuple(dimensions)
         res = self.conn.core.CreatePixmap \
@@ -1271,26 +1277,17 @@ class Connection :
           )
         return \
             pixmap_id, res
-    #end _easy_create_pixmap
-
-    def easy_create_root_pixmap(self, depth : int, dimensions : Vector, use_xrender : bool) :
-        use_root = self.conn.setup.roots[0]
-        pixmap_id, res = self._easy_create_pixmap(use_root.root, depth, dimensions)
-        self.conn.request_check(res.sequence)
-        surface = self.easy_create_surface(pixmap_id, dimensions, use_xrender)
-        return \
-            Pixmap(pixmap_id, surface, self)
-    #end easy_create_root_pixmap
+    #end _create_pixmap
 
     def _easy_create_window(self, bounds : Rect, border_width : int, set_attrs) :
         # common code for both easy_create_window and easy_create_window_async.
         use_root = self.conn.setup.roots[0]
-        window = self.conn.generate_id()
+        id = self.conn.generate_id()
         value_mask, value_list = WINATTR.pack_attributes(set_attrs)
         res = self.conn.core.CreateWindow \
           (
             depth = xcffib.XCB_COPY_FROM_PARENT,
-            wid = window,
+            wid = id,
             parent = use_root.root,
             x = bounds.left,
             y = bounds.top,
@@ -1303,7 +1300,7 @@ class Connection :
             value_list = value_list
           )
         return \
-            window, res
+            id, res
     #end _easy_create_window
 
     def easy_create_window(self, bounds : Rect, border_width : int, set_attrs) :
@@ -1327,13 +1324,52 @@ class Connection :
             window
     #end easy_create_window_async
 
-    def easy_create_surface(self, drawable, dimensions, use_xrender : bool) :
+    def _create_window(self, depth : int, parent, bounds : Rect, border_width : int, window_class, visual, set_attrs) :
+        if not isinstance(parent, Window) :
+            raise TypeError("parent must be a Window")
+        #end if
+        id = self.conn.generate_id()
+        value_mask, value_list = WINATTR.pack_attributes(set_attrs)
+        res = self.conn.core.CreateWindow \
+          (
+            depth = depth,
+            wid = id,
+            parent = parent.id,
+            x = bounds.left,
+            y = bounds.top,
+            width = bounds.width,
+            height = bounds.height,
+            border_width = border_width,
+            _class = window_class,
+            visual = visual,
+            value_mask = value_mask,
+            value_list = value_list
+          )
+        return \
+            id, res
+    #end _create_window
+
+    def create_window(self, depth : int, parent, bounds : Rect, border_width : int, window_class, visual, set_attrs) :
+        window, res = self._create_window(depth, parent, bounds, border_width, window_class, visual, set_attrs)
+        self.conn.request_check(res.sequence)
+        return \
+            window
+    #end create_window
+
+    async def create_window_async(self, depth : int, parent, bounds : Rect, border_width : int, window_class, visual, set_attrs) :
+        window, res = self._create_window(depth, parent, bounds, border_width, window_class, visual, set_attrs)
+        await self.wait_for_reply(res)
+        return \
+            window
+    #end create_window_async
+
+    def create_surface(self, screenindex : int, drawable : int, dimensions, use_xrender : bool) :
         "convenience routine which creates an XCBSurface for drawing" \
         " with Cairo into the specified drawable, with the option of" \
         " using xrender."
         dimensions = Vector.from_tuple(dimensions)
         if use_xrender :
-            use_screen = self.conn.get_screen_pointers()[0]
+            use_screen = self.conn.get_screen_pointers()[screenindex]
             self.init_ext(xrender.key)
             conn_xrender = self.conn(xrender.key)
             res = conn_xrender.QueryPictFormats()
@@ -1364,7 +1400,7 @@ class Connection :
                 height = dimensions.y
               )
         else :
-            use_root = self.conn.setup.roots[0]
+            use_root = self.conn.setup.roots[screenindex]
             use_visuals = list \
               (
                 vis
@@ -1384,7 +1420,7 @@ class Connection :
         #end if
         return \
             surface
-    #end easy_create_surface
+    #end create_surface
 
 #end Connection
 
@@ -1734,7 +1770,7 @@ class KeyMapping :
 
 class Pixmap :
     "wraps a Pixmap, with an associated surface already created for Cairo drawing." \
-    " Do not instantiate directly; get from Window.easy_create_pixmap()."
+    " Do not instantiate directly; get from Window.create_pixmap()."
 
     def __init__(self, id, surface, conn) :
         self.id = id
@@ -1882,7 +1918,7 @@ class Cursor :
 class Window :
     "convenience wrapper object around a specific X11 window, with" \
     " appropriately-filtered event dispatching. Do not instantiate" \
-    " directly; get from the easy_create() or easy_create_async() methods."
+    " directly; get from the create() or create_async() methods."
 
     __slots__ = \
         (
@@ -1930,6 +1966,13 @@ class Window :
             del type(self)._instances[self.id]
         #end if
     #end __del__
+
+    @classmethod
+    def root_window(celf, conn, rootnr) :
+        "returns a Window object representing the root window."
+        return \
+            celf(conn, conn.conn.setup.roots[rootnr].root)
+    #end root_window
 
     def set_mapped(self, mapped : bool) :
         "sets the window’s mapped (visible) state."
@@ -2084,6 +2127,34 @@ class Window :
             celf(conn, id)
     #end easy_create_async
 
+    @classmethod
+    def create(celf, conn : Connection, depth : int, parent, bounds : Rect, border_width : int, window_class, visual, set_attrs) :
+        if not isinstance(conn, Connection) :
+            raise TypeError("conn must be a Connection")
+        #end if
+        return \
+            celf \
+              (
+                conn,
+                conn.create_window
+                    (depth, parent, bounds, border_width, window_class, visual, set_attrs)
+              )
+    #end create
+
+    @classmethod
+    async def create_async(celf, conn : Connection, depth : int, parent, bounds : Rect, border_width : int, window_class, visual, set_attrs) :
+        if not isinstance(conn, Connection) :
+            raise TypeError("conn must be a Connection")
+        #end if
+        return \
+            celf \
+              (
+                conn,
+                await conn.create_window_async
+                    (depth, parent, bounds, border_width, window_class, visual, set_attrs)
+              )
+    #end create_async
+
     def destroy(self) :
         res = self.conn.core.DestroyWindow(self.id)
         self.conn.request_check(res.sequence)
@@ -2135,29 +2206,29 @@ class Window :
         self.conn.conn.request_check(res.sequence)
     #end set_shape_region
 
-    def easy_create_surface(self, dimensions : Vector, use_xrender : bool) :
+    def create_surface(self, screenindex : int, dimensions : Vector, use_xrender : bool) :
         "convenience routine which creates an XCBSurface for drawing" \
         " with Cairo into this window, with the option of using xrender."
         return \
-            self.conn.easy_create_surface(self.id, dimensions, use_xrender)
-    #end easy_create_surface
+            self.conn.create_surface(screenindex, self.id, dimensions, use_xrender)
+    #end create_surface
 
-    def easy_create_pixmap(self, depth : int, dimensions : Vector, use_xrender : bool) :
-        pixmap_id, res = self.conn._easy_create_pixmap(self.id, depth, dimensions)
+    def create_pixmap(self, screenindex : int, depth : int, dimensions : Vector, use_xrender : bool) :
+        pixmap_id, res = self.conn._create_pixmap(self.id, depth, dimensions)
         self.conn.conn.request_check(res.sequence)
-        surface = self.conn.easy_create_surface(pixmap_id, dimensions, use_xrender)
+        surface = self.conn.create_surface(screenindex, pixmap_id, dimensions, use_xrender)
         return \
             Pixmap(pixmap_id, surface, self.conn)
-    #end easy_create_pixmap
+    #end create_pixmap
 
-    async def easy_create_pixmap_async(self, depth : int, dimensions : Vector, use_xrender : bool) :
+    async def create_pixmap_async(self, screenindex : int, depth : int, dimensions : Vector, use_xrender : bool) :
         # should I bother with async version, given no actual reply is returned from server?
-        pixmap_id, res = self.conn._easy_create_pixmap(self.id, depth, dimensions)
+        pixmap_id, res = self.conn._create_pixmap(self.id, depth, dimensions)
         await self.wait_for_reply(res)
-        surface = self.conn.easy_create_surface(pixmap_id, dimensions, use_xrender)
+        surface = self.conn.create_surface(screenindex, pixmap_id, dimensions, use_xrender)
         return \
             Pixmap(pixmap_id, surface, self.conn)
-    #end easy_create_pixmap
+    #end create_pixmap
 
     def invalidate(self, area : Rect = None) :
         if area == None :
