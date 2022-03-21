@@ -1279,51 +1279,6 @@ class Connection :
             pixmap_id, res
     #end _create_pixmap
 
-    def _easy_create_window(self, bounds : Rect, border_width : int, set_attrs) :
-        # common code for both easy_create_window and easy_create_window_async.
-        use_root = self.conn.setup.roots[0]
-        id = self.conn.generate_id()
-        value_mask, value_list = WINATTR.pack_attributes(set_attrs)
-        res = self.conn.core.CreateWindow \
-          (
-            depth = xcffib.XCB_COPY_FROM_PARENT,
-            wid = id,
-            parent = use_root.root,
-            x = bounds.left,
-            y = bounds.top,
-            width = bounds.width,
-            height = bounds.height,
-            border_width = border_width,
-            _class = xproto.WindowClass.InputOutput,
-            visual = use_root.root_visual,
-            value_mask = value_mask,
-            value_list = value_list
-          )
-        return \
-            id, res
-    #end _easy_create_window
-
-    def easy_create_window(self, bounds : Rect, border_width : int, set_attrs) :
-        "convenience wrapper which handles a lot of the seeming repetitive tasks" \
-        " associated with window creation. set_attrs is a sequence of" \
-        " («bit_nr», «value») pairs where each bit_nr is a member of the WINATTR" \
-        " enumeration identifying a window attribute, and «value» is the" \
-        " corresponding integer value to set for that attribute. Attributes may" \
-        " be specified in any order."
-        window, res = self._easy_create_window(bounds, border_width, set_attrs)
-        self.conn.request_check(res.sequence)
-        return \
-            window
-    #end easy_create_window
-
-    async def easy_create_window_async(self, bounds : Rect, border_width : int, set_attrs) :
-        "async version of easy_create_window convenience wrapper."
-        window, res = self._easy_create_window(bounds, border_width, set_attrs)
-        await self.wait_for_reply(res)
-        return \
-            window
-    #end easy_create_window_async
-
     def _create_window(self, depth : int, parent, bounds : Rect, border_width : int, window_class, visual, set_attrs) :
         if not isinstance(parent, Window) :
             raise TypeError("parent must be a Window")
@@ -2106,26 +2061,6 @@ class Window :
             raise KeyError("specified action+args was not installed as an event filter")
         #end if
     #end remove_event_filter
-
-    @classmethod
-    def easy_create(celf, conn, bounds : Rect, border_width : int, set_attrs) :
-        if not isinstance(conn, Connection) :
-            raise TypeError("conn must be a Connection")
-        #end if
-        id = conn.easy_create_window(bounds, border_width, set_attrs)
-        return \
-            celf(conn, id)
-    #end easy_create
-
-    @classmethod
-    async def easy_create_async(celf, conn, bounds : Rect, border_width : int, set_attrs) :
-        if not isinstance(conn, Connection) :
-            raise TypeError("conn must be a Connection")
-        #end if
-        id = await conn.easy_create_window_async(bounds, border_width, set_attrs)
-        return \
-            celf(conn, id)
-    #end easy_create_async
 
     @classmethod
     def create(celf, conn : Connection, depth : int, parent, bounds : Rect, border_width : int, window_class, visual, set_attrs) :
