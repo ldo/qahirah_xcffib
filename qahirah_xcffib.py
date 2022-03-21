@@ -1283,15 +1283,7 @@ class Connection :
         # common code for both easy_create_window and easy_create_window_async.
         use_root = self.conn.setup.roots[0]
         window = self.conn.generate_id()
-        value_mask, value_list = WINATTR.pack_attributes \
-          (
-            attrs = set_attrs,
-            default_attrs =
-              (
-                (WINATTR.BACKPIXEL, use_root.white_pixel),
-                (WINATTR.BORDERPIXEL, use_root.black_pixel),
-              )
-          )
+        value_mask, value_list = WINATTR.pack_attributes(set_attrs)
         res = self.conn.core.CreateWindow \
           (
             depth = xcffib.XCB_COPY_FROM_PARENT,
