@@ -125,7 +125,7 @@ class Colour(qahirah.Colour) :
         "converts an integer combining suitably-shifted Cairo-compatible" \
         " r, g and b components to a Colour."
         return \
-            celf((pixel >> 16 & 255) / 255, (pixel >> 8 & 255) / 255, (pixel& 255) / 255, 1)
+            celf((pixel >> 16 & 255) / 255, (pixel >> 8 & 255) / 255, (pixel & 255) / 255, 1)
     #end from_pixel
 
 #end Colour
