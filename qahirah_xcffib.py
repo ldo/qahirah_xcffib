@@ -302,6 +302,8 @@ class X :
     GenericEvent = 35
     LASTEvent = 36 # one beyond last defined event number
 
+    ALL_EVENTS = set(range(KeyPress, LASTEvent))
+
 #end X
 
 class XA :
@@ -2038,7 +2040,8 @@ class Window :
         " “action(window, event, *args)” where the meaning of args is up to you." \
         "\n" \
         "Only one instance of any action+args combination is allowed to be" \
-        " installed at a time."
+        " installed at a time. If there is an existing entry, selevents will be" \
+        " added to its event set, provided it was not None."
         if (
                 selevents != None
             and
@@ -2046,40 +2049,70 @@ class Window :
         ) :
             raise TypeError("selevents is not a set or sequence of integer event codes")
         #end if
-        if (
-            any
-              (
-                elt[:2] == (action, args)
-                for i in range(len(self._event_filters))
-                for elt in (self._event_filters[i],)
-              )
-        ) :
-            raise KeyError("attempt to install duplicate action+args")
-        #end if
-        if len(self._event_filters) == 0 :
-            self.conn.add_event_filter(self._conn_event_filter, (weak_ref(self),))
-        #end if
-        self._event_filters.append((action, args, selevents))
-    #end add_event_filter
-
-    def remove_event_filter(self, action, args = (), *, optional : bool) :
-        "removes a previously-installed event filter. optional indicates" \
-        " not to report an error if no such filter is installed."
-        pos = list \
+        filters = self._event_filters
+        add_conn_filter = len(filters) == 0
+        pos = tuple \
           (
             i
-            for i in range(len(self._event_filters))
-            for elt in (self._event_filters[i],)
+            for i in range(len(filters))
+            for elt in (filters[i],)
             if elt[:2] == (action, args)
           )
-        assert len(pos) <= 1
-        if len(pos) == 1 :
-            self._event_filters.pop(pos[0])
-            if len(self._event_filters) == 0 :
-                self.conn.remove_event_filter(self._conn_event_filter, (weak_ref(self),), optional = True)
+        if len(pos) != 0 :
+            pos = pos[0]
+            if (filters[pos][2] != None) != (selevents != None) :
+                raise ValueError("incompatible change to wildcard selevents")
             #end if
-        elif not optional :
-            raise KeyError("specified action+args was not installed as an event filter")
+            if selevents != None :
+                filters[pos] = \
+                    (
+                        filters[pos][:2]
+                    +
+                        (filters[pos][2] | selevents,)
+                    )
+            #end if
+        else :
+            filters.append((action, args, selevents))
+        #end if
+        if add_conn_filter :
+            self.conn.add_event_filter(self._conn_event_filter, (weak_ref(self),))
+        #end if
+    #end add_event_filter
+
+    def remove_event_filter(self, action, args = (), selevents = None) :
+        "removes the specified events from the event set for a previously-installed" \
+        " event filter; if the resulting event set is empty, the filter is removed.\n" \
+        "\n" \
+        "If, say, the filter was installed with an event set of X.ALL_EVENTS," \
+        " then events can be selectively removed from this set. But if the event" \
+        " set was None, then the filter can only be removed in its entirety" \
+        " by setting selevents to None."
+        filters = self._event_filters
+        pos = tuple \
+          (
+            i
+            for i in range(len(filters))
+            for elt in (filters[i],)
+            if elt[:2] == (action, args)
+          )
+        if len(pos) != 0 :
+            pos = pos[0]
+            eventset = filters[pos][2]
+            if (eventset != None) != (selevents != None) :
+                raise ValueError("incompatible change to wildcard selevents")
+            #end if
+            if selevents != None :
+                eventset -= selevents
+            #end if
+            if eventset != None and len(eventset) != 0 :
+                filters[pos] = filters[pos][:2] + (eventset,)
+            else :
+                filters[:] = filters[:pos] + filters[pos + 1:]
+                if len(filters) == 0 :
+                    self.conn.remove_event_filter \
+                        (self._conn_event_filter, (weak_ref(self),), optional = True)
+                #end if
+            #end if
         #end if
     #end remove_event_filter
 
