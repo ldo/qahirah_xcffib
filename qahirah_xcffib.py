@@ -1028,6 +1028,7 @@ class Connection :
             "_ext_inited",
             "_event_filters",
             "_reply_queue",
+            "_root_windows",
             "last_sequence",
         ) # to forestall typos
 
@@ -1077,6 +1078,7 @@ class Connection :
           #   * I can block waiting for an event, or I can poll, but
           #   * I can only block waiting for a reply to a request
           #     (xcffib doesn’t provide a wrapper for xcb_poll_for_reply).
+        self._root_windows = {}
         self.last_sequence = None
     #end __init__
 
@@ -1282,8 +1284,12 @@ class Connection :
 
     def root_window(self, rootnr) :
         "returns a Window object representing the root window."
+        if rootnr not in self._root_windows :
+            self._root_windows[rootnr] = Window.root_window(self, rootnr)
+            # create and keep for reuse
+        #end if
         return \
-            Window.root_window(self, rootnr)
+            self._root_windows[rootnr]
     #end root_window
 
     def _create_pixmap(self, drawable : int, depth : int, dimensions : Vector) :
