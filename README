@@ -12,5 +12,9 @@ standard `asyncio` event loop API introduced in Python 3.5, providing
 useful functions for handling events and creating cursors, among other
 things.
 
+To see examples of this module in action, see my `qahirah_xcffib_examples`
+project ([GitLab](https://gitlab.com/ldo/qahirah_xcffib_examples),
+[GitHub](https://github.com/ldo/qahirah_xcffib_examples)).
+
 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>
 2022 March 22
