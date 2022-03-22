@@ -129,6 +129,7 @@ class Colour(qahirah.Colour) :
     #end from_pixel
 
 #end Colour
+Colour.x11 = Colour.X11_Colours(Colour)
 
 #+
 # X11 protocol definitions
