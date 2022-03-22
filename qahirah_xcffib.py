@@ -108,6 +108,26 @@ class Colour(qahirah.Colour) :
             celf(*tuple(c / 65535 for c in components) + (1,))
     #end from_card16_rgb
 
+    def to_pixel(self) :
+        "returns an integer combining suitably-shifted Cairo-compatible r, g and b components."
+        return \
+            (
+                round(self.r * 255) << 16
+            |
+                round(self.g * 255) << 8
+            |
+                round(self.b * 255)
+            )
+    #end to_pixel
+
+    @classmethod
+    def from_pixel(celf, pixel) :
+        "converts an integer combining suitably-shifted Cairo-compatible" \
+        " r, g and b components to a Colour."
+        return \
+            celf((pixel >> 16 & 255) / 255, (pixel >> 8 & 255) / 255, (pixel& 255) / 255, 1)
+    #end from_pixel
+
 #end Colour
 
 #+
