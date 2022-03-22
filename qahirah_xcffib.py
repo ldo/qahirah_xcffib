@@ -2082,6 +2082,9 @@ class Window :
                     )
             #end if
         else :
+            if selevents != None :
+                selevents = set(selevents) # ensure it’s a unique copy
+            #end if
             filters.append((action, args, selevents))
         #end if
         if add_conn_filter :
