@@ -2273,6 +2273,11 @@ class Window :
     #end create_surface
 
     def create_pixmap(self, screenindex : int, depth : int, dimensions : Vector, use_xrender : bool) :
+        "creates a Pixmap with the specified depth and root visual. Note that" \
+        " Cairo only seems able to draw into pixmaps with a depth of 24, while" \
+        " Cursor.create() wants pixmaps with a depth of 1. Alternatively, you can" \
+        " use Cursor.create_from_rgb(), which will downconvert from depth 24 to" \
+        " depth 1."
         pixmap_id, res = self.conn._create_pixmap(self.id, depth, dimensions)
         self.conn.conn.request_check(res.sequence)
         surface = self.conn.create_surface(screenindex, pixmap_id, dimensions, use_xrender)
