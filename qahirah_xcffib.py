@@ -135,6 +135,10 @@ Colour.x11 = Colour.X11_Colours(Colour)
 # X11 protocol definitions
 #-
 
+XID = int
+  # ID codes used for identifying objects created in the server
+  # connection; codes are assigned by client.
+
 class X :
     "various X11 protocol codes, taken from /usr/include/X11/Xproto.h" \
     " and /usr/include/X11/X.h."
@@ -1292,7 +1296,7 @@ class Connection :
             self._root_windows[rootnr]
     #end root_window
 
-    def _create_pixmap(self, drawable : int, depth : int, dimensions : Vector) :
+    def _create_pixmap(self, drawable : XID, depth : int, dimensions : Vector) :
         # common code for create_pixmap routines.
         pixmap_id = self.conn.generate_id()
         dimensions = Vector.from_tuple(dimensions)
@@ -1347,7 +1351,7 @@ class Connection :
             window
     #end create_window_async
 
-    def create_surface(self, screenindex : int, drawable : int, dimensions, use_xrender : bool) :
+    def create_surface(self, screenindex : int, drawable : XID, dimensions, use_xrender : bool) :
         "convenience routine which creates an XCBSurface for drawing" \
         " with Cairo into the specified drawable, with the option of" \
         " using xrender."
@@ -2615,8 +2619,8 @@ class GContext :
     def copy_area \
       (
         self,
-        src_drawable : int,
-        dst_drawable : int,
+        src_drawable : XID,
+        dst_drawable : XID,
         src_pos : Vector,
         dst_pos : Vector,
         dimensions : Vector
@@ -2644,8 +2648,8 @@ class GContext :
     def copy_plane \
       (
         self,
-        src_drawable : int,
-        dst_drawable : int,
+        src_drawable : XID,
+        dst_drawable : XID,
         src_pos : Vector,
         dst_pos : Vector,
         dimensions : Vector,
