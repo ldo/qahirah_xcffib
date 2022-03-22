@@ -2044,7 +2044,7 @@ class Window :
             and
                 not all(isinstance(e, int) and e >= 2 for e in selevents)
         ) :
-            raiseTypeError("selevents is not a set or sequence of integer event codes")
+            raise TypeError("selevents is not a set or sequence of integer event codes")
         #end if
         if (
             any
