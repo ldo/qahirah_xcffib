@@ -7,8 +7,9 @@ This module subclasses `qahirah.XCBSurface` with overriding create
 methods that take `Connection` and other objects as defined by xcffib
 and does appropriate conversions before passing them to the
 corresponding methods in the base class. This allows you to use
-Cairo to do onscreen drawing via Qahirah. It also provides useful
-functions for handling events and creating cursors, among other
+Cairo to do onscreen drawing via Qahirah. It also interfaces to the
+standard `asyncio` event loop API introduced in Python 3.5, providing
+useful functions for handling events and creating cursors, among other
 things.
 
 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>
