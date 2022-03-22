@@ -1819,11 +1819,13 @@ class Cursor :
         celf,
         conn : Connection,
         source : Pixmap,
-        mask : Pixmap,
+        mask : Pixmap, # optional
         forecolour : Colour,
         backcolour : Colour,
         hotspot : Vector
       ) :
+        "creates a Cursor from the specified settings. the source and (if specified)" \
+        " mask pixmaps must be 1-bit deep."
         if (
                 not isinstance(conn, Connection)
             or
@@ -1866,6 +1868,61 @@ class Cursor :
         return \
             celf(conn, id)
     #end create
+
+    @classmethod
+    def create_from_rgb \
+      (
+        celf,
+        conn : Connection,
+        source : Pixmap,
+        mask : Pixmap, # optional
+        dimensions : Vector,
+        forecolour : Colour,
+        backcolour : Colour,
+        hotspot : Vector,
+        use_xrender : bool
+      ) :
+        "creates a Cursor from the specified settings. The source and (if specified)" \
+        " mask Pixmaps are assumed to be 24 bits deep (suitable for Cairo to draw" \
+        " into); they will be down-converted to 1 bit before use."
+        src1bit = conn.root_window(0).create_pixmap(0, 1, dimensions, use_xrender)
+        if mask != None :
+            mask1bit = conn.root_window(0).create_pixmap(0, 1, dimensions, use_xrender)
+        else :
+            mask1bit = None
+        #end if
+        cursgc = GContext.create \
+          (
+            conn = conn,
+            drawable_id = src1bit.id,
+            set_attrs = ()
+          )
+        for srcpix, dstpix in \
+            (
+                (
+                    (source, src1bit),
+                )
+            +
+                (
+                    (),
+                    ((mask, mask1bit),),
+                )[mask != None]
+            ) \
+        :
+            cursgc.copy_plane \
+              (
+                src_drawable = srcpix.id,
+                dst_drawable = dstpix.id,
+                src_pos = (0, 0),
+                dst_pos = (0, 0),
+                dimensions = dimensions,
+                bit_plane = 1 << 15
+                  # use top green bit, avoid bottom bits because of antialiasing
+              )
+        #end for
+        return \
+            celf.create(conn, src1bit, mask1bit, forecolour, backcolour, hotspot)
+    #end create_from_rgb
 
     def __del__(self) :
         if self.conn != None :
