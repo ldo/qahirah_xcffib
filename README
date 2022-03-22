@@ -6,7 +6,10 @@ Cairo graphics library. You will need to have that installed as well.
 This module subclasses `qahirah.XCBSurface` with overriding create
 methods that take `Connection` and other objects as defined by xcffib
 and does appropriate conversions before passing them to the
-corresponding methods in the base class.
+corresponding methods in the base class. This allows you to use
+Cairo to do onscreen drawing via Qahirah. It also provides useful
+functions for handling events and creating cursors, among other
+things.
 
 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>
-2022 February 20
+2022 March 22
