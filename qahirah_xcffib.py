@@ -306,7 +306,7 @@ class X :
     GenericEvent = 35
     LASTEvent = 36 # one beyond last defined event number
 
-    ALL_EVENTS = set(range(KeyPress, LASTEvent))
+    ALL_EVENTS = frozenset(range(KeyPress, LASTEvent))
 
 #end X
 
