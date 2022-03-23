@@ -2879,6 +2879,138 @@ class Region :
 #end Region
 
 #+
+# Convenience classes
+#-
+
+class BUTTON_STATE(enum.Enum) :
+    "states in which to display a button."
+    NORMAL = 0
+    HIGHLIGHTED = 1
+    DISABLED = 2
+#end BUTTON_STATE
+
+class ButtonHandler :
+    "convenience class for implementing simple buttons that respond to clicks." \
+    " You pass two callbacks: handle_draw, which actually renders the" \
+    " button, and handle_click, which performs the button action.\n" \
+    "\n" \
+    "handle_draw is invoked as handle_draw(ctx, dimensions, state, *additional_args)" \
+    " while handle_click is invoked as handle_click(*args)."
+
+    def __init__ \
+      (
+        self,
+        parent : Window,
+        bounds : Rect,
+        gravity : int,
+        handle_draw, handle_draw_args,
+        handle_click, handle_click_args,
+        enabled : bool,
+        use_xrender : bool
+      ) :
+        self.button = Window.create \
+          (
+            conn = parent.conn,
+            depth = xcffib.XCB_COPY_FROM_PARENT,
+            parent = parent,
+            bounds = bounds,
+            border_width = 0,
+            window_class = xproto.WindowClass.InputOutput,
+            visual = xcffib.XCB_COPY_FROM_PARENT,
+            set_attrs =
+                (
+                    (WINATTR.EVENTMASK,
+                            xproto.EventMask.Exposure
+                        |
+                            xproto.EventMask.ButtonPress
+                        |
+                            xproto.EventMask.ButtonRelease
+                        |
+                            xproto.EventMask.EnterWindow
+                        |
+                            xproto.EventMask.LeaveWindow,
+                    ),
+                    (WINATTR.WINGRAVITY, gravity),
+                )
+          )
+        self.handle_draw = handle_draw
+        self.handle_draw_args = handle_draw_args
+        self.handle_click = handle_click
+        self.handle_click_args = handle_click_args
+        for evt, handler in \
+            (
+                (X.Expose, self.handle_expose),
+                (X.ButtonPress, self.handle_press),
+                (X.EnterNotify, self.handle_enter),
+                (X.LeaveNotify, self.handle_leave),
+                (X.ButtonRelease, self.handle_release),
+            ) \
+        :
+            self.button.add_event_filter(handler, selevents = {evt})
+        #end for
+        self.dimensions = bounds.dimensions
+        self.surface = self.button.create_surface(parent.conn.conn.pref_screen, bounds.dimensions, use_xrender)
+        self.ctx = qahirah.Context.create(self.surface)
+        self.button.set_mapped(True)
+        self.enabled = enabled
+        self.pressed = self.entered = False
+    #end __init__
+
+    def set_enabled(self, enabled : bool) :
+        if enabled != self.enabled :
+            self.enabled = enabled
+            self.handle_expose(None, None)
+        #end if
+    #end set_enabled
+
+    def handle_expose(self, button, evt) :
+        if self.enabled :
+            if self.pressed and self.entered :
+                state = BUTTON_STATE.HIGHLIGHTED
+            else :
+                state = BUTTON_STATE.NORMAL
+            #end if
+        else :
+            state = BUTTON_STATE.DISABLED
+        #end if
+        self.handle_draw(self.ctx, self.dimensions, state, *self.handle_draw_args)
+        self.surface.flush()
+    #end handle_expose
+
+    def handle_press(self, button, evt) :
+        if self.enabled :
+            self.pressed = True
+            self.handle_expose(button, evt)
+        #end if
+    #end handle_press
+
+    def handle_enter(self, button, evt) :
+        if self.enabled :
+            self.entered = True
+            if self.pressed :
+                self.handle_expose(button, evt)
+            #end if
+        #end if
+    #end handle_enter
+
+    def handle_leave(self, button, evt) :
+        self.entered = False
+        if self.pressed :
+            self.handle_expose(button, evt)
+        #end if
+    #end handle_leave
+
+    def handle_release(self, button, evt) :
+        if self.pressed and self.entered :
+            self.handle_click(*self.handle_click_args)
+        #end if
+        self.pressed = False
+        self.handle_expose(button, evt)
+    #end handle_release
+
+#end ButtonHandler
+
+#+
 # Cleanup
 #-
 
