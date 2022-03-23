@@ -1291,6 +1291,7 @@ class Connection :
         if rootnr not in self._root_windows :
             self._root_windows[rootnr] = Window.root_window(self, rootnr)
             # create and keep for reuse
+            # FIXME: creates reference circularities.
         #end if
         return \
             self._root_windows[rootnr]
