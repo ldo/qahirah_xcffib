@@ -2109,6 +2109,9 @@ class Window :
         "Only one instance of any action+args combination is allowed to be" \
         " installed at a time. If there is an existing entry, selevents will be" \
         " added to its event set, provided it was not None."
+        if isinstance(selevents, int) :
+            selevents = {selevents}
+        #end if
         if (
                 selevents != None
             and
