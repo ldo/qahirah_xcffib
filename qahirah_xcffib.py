@@ -2171,6 +2171,9 @@ class Window :
         if len(pos) != 0 :
             pos = pos[0]
             eventset = filters[pos][2]
+            if isinstance(selevents, int) :
+                selevents = {selevents}
+            #end if
             if (eventset != None) != (selevents != None) :
                 raise ValueError("incompatible change to wildcard selevents")
             #end if
