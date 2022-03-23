@@ -9,8 +9,8 @@ with the xcffib binding.
 # Useful XCB docs:
 # <https://xcb.freedesktop.org/manual/modules.html>
 # <https://xcb.freedesktop.org/PublicApi/>
-# <https://www.x.org/releases/X11R7.5/doc/libxcb/tutorial/index.html>
-# (linked from <https://www.x.org/releases/X11R7.5/doc/>)
+# <https://www.x.org/releases/X11R7.7/doc/libxcb/tutorial/index.html>
+# General X11 docs: <https://www.x.org/releases/X11R7.7/doc/index.html>
 
 import struct
 import enum
