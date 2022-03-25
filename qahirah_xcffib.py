@@ -2669,8 +2669,13 @@ class GContext :
     def destroy(self) :
         if self.id != None :
             if self.conn != None :
-                res = self.conn.conn.core.FreeGC(self.id)
-                self.conn.conn.request_check(res.sequence)
+                try :
+                    res = self.conn.conn.core.FreeGC(self.id)
+                except xcffib.ConnectionException :
+                    pass
+                else :
+                    self.conn.conn.request_check(res.sequence)
+                #end try
                 self.conn = None
             #end if
             self.id = None
