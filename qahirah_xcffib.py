@@ -1774,6 +1774,23 @@ class Pixmap :
         self.destroy()
     #end __del__(self)
 
+    def convert_to_1bit(self, dimensions : Vector, use_xrender : bool) :
+        "assuming this is an RGB Pixmap, creates a new 1-bit Pixmap containing" \
+        " a bilevel conversion of the image."
+        use_screen = self.conn.conn.pref_screen
+        result = self.conn.root_window(use_screen) \
+            .create_pixmap(use_screen, 1, dimensions, use_xrender)
+        cursgc = GContext.create \
+          (
+            conn = self.conn,
+            drawable_id = result.id,
+            set_attrs = ()
+          )
+        cursgc.copy_to_1bit(self.id, result.id, dimensions)
+        return \
+            result
+    #end convert_to_1bit
+
 #end Pixmap
 
 class Cursor :
@@ -1904,16 +1921,7 @@ class Cursor :
                 )[mask != None]
             ) \
         :
-            cursgc.copy_plane \
-              (
-                src_drawable = srcpix.id,
-                dst_drawable = dstpix.id,
-                src_pos = (0, 0),
-                dst_pos = (0, 0),
-                dimensions = dimensions,
-                bit_plane = 1 << 15
-                  # use top green bit, avoid bottom bits because of antialiasing
-              )
+            cursgc.copy_to_1bit(srcpix.id, dstpix.id, dimensions)
         #end for
         return \
             celf.create(conn, src1bit, mask1bit, forecolour, backcolour, hotspot)
@@ -2747,6 +2755,22 @@ class GContext :
           )
         self.conn.conn.request_check(res.sequence)
     #end copy_plane
+
+    def copy_to_1bit(self, src_drawable : XID, dst_drawable : XID, dimensions : Vector) :
+        "assuming src_drawable is an RGB drawable, while dst_drawable is" \
+        " 1 bit deep, copies a suitable bit plane of the former to the" \
+        " latter to produce a bilevel image."
+        self.copy_plane \
+          (
+            src_drawable = src_drawable,
+            dst_drawable = dst_drawable,
+            src_pos = (0, 0),
+            dst_pos = (0, 0),
+            dimensions = dimensions,
+            bit_plane = 1 << 15
+              # use top green bit, avoid bottom bits because of antialiasing
+          )
+    #end copy_to_1bit
 
 #end GContext
 
