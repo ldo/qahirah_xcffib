@@ -1404,6 +1404,22 @@ class Connection :
             surface
     #end create_surface
 
+    def get_geometry(self, drawable : XID) :
+        res = self.conn.core.GetGeometry(drawable)
+        result = res.reply()
+        result.bounds = Rect(result.x, result.y, result.width, result.height)
+        return \
+            result
+    #end get_geometry
+
+    async def get_geometry_async(self, drawable : XID) :
+        res = self.conn.core.GetGeometry(drawable)
+        result = await self.wait_for_reply(res)
+        result.bounds = Rect(result.x, result.y, result.width, result.height)
+        return \
+            result
+    #end get_geometry_async
+
 #end Connection
 
 class AtomCache :
@@ -2235,19 +2251,13 @@ class Window :
     #end destroy_async
 
     def get_geometry(self) :
-        res = self.conn.conn.core.GetGeometry(self.id)
-        result = res.reply()
-        result.bounds = Rect(result.x, result.y, result.width, result.height)
         return \
-            result
+            self.conn.get_geometry(self.id)
     #end get_geometry
 
     async def get_geometry_async(self) :
-        res = self.conn.conn.core.GetGeometry(self.id)
-        result = await self.conn.wait_for_reply(res)
-        result.bounds = Rect(result.x, result.y, result.width, result.height)
         return \
-            result
+            await self.conn.get_geometry_async(self.id)
     #end get_geometry_async
 
     def configure(self, config_attrs) :
