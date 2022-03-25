@@ -2871,6 +2871,20 @@ class Region :
             celf(conn, id)
     #end create_from_bitmap
 
+    @classmethod
+    def create_from_bitmap_rgb \
+      (
+        celf,
+        conn : Connection,
+        pix : Pixmap,
+        dimensions : Vector,
+        use_xrender : bool
+      ) :
+        pix1bit = pix.convert_to_1bit(dimensions, use_xrender)
+        return \
+            celf.create_from_bitmap(conn, pix1bit)
+    #end create_from_bitmap_rgb
+
     # TODO: create from window, create from GC,
     # SetRegion, CopyRegion, UnionRegion, IntersectRection, SubtractRegion,
     # InvertRegion, TranslateRegion, RegionExtents, ExpandRegion
