@@ -1879,9 +1879,10 @@ class Cursor :
         "creates a Cursor from the specified settings. The source and (if specified)" \
         " mask Pixmaps are assumed to be 24 bits deep (suitable for Cairo to draw" \
         " into); they will be down-converted to 1 bit before use."
-        src1bit = conn.root_window(0).create_pixmap(0, 1, dimensions, use_xrender)
+        use_screen = conn.conn.pref_screen
+        src1bit = conn.root_window(use_screen).create_pixmap(use_screen, 1, dimensions, use_xrender)
         if mask != None :
-            mask1bit = conn.root_window(0).create_pixmap(0, 1, dimensions, use_xrender)
+            mask1bit = conn.root_window(use_screen).create_pixmap(use_screen, 1, dimensions, use_xrender)
         else :
             mask1bit = None
         #end if
