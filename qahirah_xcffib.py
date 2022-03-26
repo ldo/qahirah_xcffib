@@ -1027,6 +1027,7 @@ class Connection :
             "conn",
             "loop",
             "atom_cache",
+            "use_xrender",
             "user_data",
             "_conn_fd",
             "_ext_inited",
@@ -1060,6 +1061,7 @@ class Connection :
         self.conn = conn
         self.loop = loop
         self.atom_cache = AtomCache(self)
+        self.use_xrender = True
         self.user_data = qahirah.UserDataDict()
         self._conn_fd = conn.get_file_descriptor()
           # keep my own copy because conn.get_file_descriptor()
@@ -1345,12 +1347,12 @@ class Connection :
             window
     #end create_window_async
 
-    def create_surface(self, screenindex : int, drawable : XID, dimensions, use_xrender : bool) :
+    def create_surface(self, screenindex : int, drawable : XID, dimensions) :
         "convenience routine which creates an XCBSurface for drawing" \
         " with Cairo into the specified drawable, with the option of" \
         " using xrender."
         dimensions = Vector.from_tuple(dimensions)
-        if use_xrender :
+        if self.use_xrender :
             use_screen = self.conn.get_screen_pointers()[screenindex]
             self.init_ext(xrender.key)
             conn_xrender = self.conn(xrender.key)
@@ -1790,12 +1792,12 @@ class Pixmap :
         self.destroy()
     #end __del__(self)
 
-    def convert_to_1bit(self, dimensions : Vector, use_xrender : bool) :
+    def convert_to_1bit(self, dimensions : Vector) :
         "assuming this is an RGB Pixmap, creates a new 1-bit Pixmap containing" \
         " a bilevel conversion of the image."
         use_screen = self.conn.conn.pref_screen
         result = self.conn.root_window(use_screen) \
-            .create_pixmap(use_screen, 1, dimensions, use_xrender)
+            .create_pixmap(use_screen, 1, dimensions)
         cursgc = GContext.create \
           (
             conn = self.conn,
@@ -1906,16 +1908,15 @@ class Cursor :
         dimensions : Vector,
         forecolour : Colour,
         backcolour : Colour,
-        hotspot : Vector,
-        use_xrender : bool
+        hotspot : Vector
       ) :
         "creates a Cursor from the specified settings. The source and (if specified)" \
         " mask Pixmaps are assumed to be 24 bits deep (suitable for Cairo to draw" \
         " into); they will be down-converted to 1 bit before use."
         use_screen = conn.conn.pref_screen
-        src1bit = conn.root_window(use_screen).create_pixmap(use_screen, 1, dimensions, use_xrender)
+        src1bit = conn.root_window(use_screen).create_pixmap(use_screen, 1, dimensions)
         if mask != None :
-            mask1bit = conn.root_window(use_screen).create_pixmap(use_screen, 1, dimensions, use_xrender)
+            mask1bit = conn.root_window(use_screen).create_pixmap(use_screen, 1, dimensions)
         else :
             mask1bit = None
         #end if
@@ -2284,14 +2285,14 @@ class Window :
         self.conn.conn.request_check(res.sequence)
     #end set_shape_region
 
-    def create_surface(self, screenindex : int, dimensions : Vector, use_xrender : bool) :
+    def create_surface(self, screenindex : int, dimensions : Vector) :
         "convenience routine which creates an XCBSurface for drawing" \
         " with Cairo into this window, with the option of using xrender."
         return \
-            self.conn.create_surface(screenindex, self.id, dimensions, use_xrender)
+            self.conn.create_surface(screenindex, self.id, dimensions)
     #end create_surface
 
-    def create_pixmap(self, screenindex : int, depth : int, dimensions : Vector, use_xrender : bool) :
+    def create_pixmap(self, screenindex : int, depth : int, dimensions : Vector) :
         "creates a Pixmap with the specified depth and root visual. Note that" \
         " Cairo only seems able to draw into pixmaps with a depth of 24, while" \
         " Cursor.create() wants pixmaps with a depth of 1. Alternatively, you can" \
@@ -2299,16 +2300,16 @@ class Window :
         " depth 1."
         pixmap_id, res = self.conn._create_pixmap(self.id, depth, dimensions)
         self.conn.conn.request_check(res.sequence)
-        surface = self.conn.create_surface(screenindex, pixmap_id, dimensions, use_xrender)
+        surface = self.conn.create_surface(screenindex, pixmap_id, dimensions)
         return \
             Pixmap(pixmap_id, surface, self.conn)
     #end create_pixmap
 
-    async def create_pixmap_async(self, screenindex : int, depth : int, dimensions : Vector, use_xrender : bool) :
+    async def create_pixmap_async(self, screenindex : int, depth : int, dimensions : Vector) :
         # should I bother with async version, given no actual reply is returned from server?
         pixmap_id, res = self.conn._create_pixmap(self.id, depth, dimensions)
         await self.wait_for_reply(res)
-        surface = self.conn.create_surface(screenindex, pixmap_id, dimensions, use_xrender)
+        surface = self.conn.create_surface(screenindex, pixmap_id, dimensions)
         return \
             Pixmap(pixmap_id, surface, self.conn)
     #end create_pixmap
@@ -2877,10 +2878,9 @@ class Region :
         celf,
         conn : Connection,
         pix : Pixmap,
-        dimensions : Vector,
-        use_xrender : bool
+        dimensions : Vector
       ) :
-        pix1bit = pix.convert_to_1bit(dimensions, use_xrender)
+        pix1bit = pix.convert_to_1bit(dimensions)
         return \
             celf.create_from_bitmap(conn, pix1bit)
     #end create_from_bitmap_rgb
@@ -2952,8 +2952,7 @@ class ButtonHandler :
         gravity : int,
         handle_draw, handle_draw_args,
         handle_click, handle_click_args,
-        enabled : bool,
-        use_xrender : bool
+        enabled : bool
       ) :
         self.button = Window.create \
           (
@@ -2996,7 +2995,7 @@ class ButtonHandler :
             self.button.add_event_filter(handler, selevents = {evt})
         #end for
         self.dimensions = bounds.dimensions
-        self.surface = self.button.create_surface(parent.conn.conn.pref_screen, bounds.dimensions, use_xrender)
+        self.surface = self.button.create_surface(parent.conn.conn.pref_screen, bounds.dimensions)
         self.ctx = qahirah.Context.create(self.surface)
         self.button.set_mapped(True)
         self.enabled = enabled
