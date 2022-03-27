@@ -2063,7 +2063,7 @@ class Window :
         if self.conn != None :
             self.conn.remove_event_filter(self._conn_event_filter, weak_ref(self), optional = True)
             self.conn = None
-            del type(self)._instances[self.id]
+            type(self)._instances.pop(self.id, None)
         #end if
     #end __del__
 
