@@ -1781,10 +1781,17 @@ class Pixmap :
     def destroy(self) :
         if self.id != None :
             self.surface = None
-            res = self.conn.conn.core.FreePixmap(self.id)
-            self.conn.conn.request_check(res.sequence)
+            if self.conn != None :
+                try :
+                    res = self.conn.conn.core.FreePixmap(self.id)
+                except xcffib.ConnectionException :
+                    pass
+                else :
+                    self.conn.conn.request_check(res.sequence)
+                #end try
+                self.conn = None
+            #end if
             self.id = None
-            self.conn = None
         #end if
     #end destroy
 
@@ -1944,15 +1951,24 @@ class Cursor :
             celf.create(conn, src1bit, mask1bit, forecolour, backcolour, hotspot)
     #end create_from_rgb
 
-    def __del__(self) :
-        if self.conn != None :
-            if self.id != None :
-                res = self.conn.conn.core.FreeCursor(self.id)
-                self.conn.conn.request_check(res.sequence)
-                self.id = None
+    def destroy(self) :
+        if self.id != None :
+            if self.conn != None :
+                try :
+                    res = self.conn.conn.core.FreeCursor(self.id)
+                except xcffib.ConnectionException :
+                    pass
+                else :
+                    self.conn.conn.request_check(res.sequence)
+                #end try
+                self.conn = None
             #end if
-            self.conn = None
+            self.id = None
         #end if
+    #end destroy
+
+    def __del__(self) :
+        self.destroy()
     #end __del__
 
     def recolour(self, forecolour : Colour, backcolour : Colour) :
