@@ -1655,19 +1655,21 @@ class KeyMapping :
         (
             "__weakref__",
             "_code_syms",
+            "mod_sets",
             "user_data", # dict, initially empty, may be used by caller for any purpose
             "mode_switch_mod",
             "numlock_mod",
             "lock_is_shift_lock",
         ) # to forestall typos
 
-    def __init__(self, mapping, start_keycode) :
-        "mapping is the reply object from a GetKeyboardMapping request."
+    def __init__(self, keys, start_keycode, mods) :
+        "keys is the reply object from a GetKeyboardMapping request," \
+        " while mods is the reply object from a GetModifierMapping request."
         code_syms = {}
-        keysyms = list(mapping.keysyms)
-        for i in range(len(keysyms) // mapping.keysyms_per_keycode) :
+        keysyms = list(keys.keysyms)
+        for i in range(len(keysyms) // keys.keysyms_per_keycode) :
             seg = keysyms \
-              [i * mapping.keysyms_per_keycode : (i + 1) * mapping.keysyms_per_keycode] \
+              [i * keys.keysyms_per_keycode : (i + 1) * keys.keysyms_per_keycode] \
               [:4]
             # According to X11 core spec, first two entries form “group 1”, next two
             # form “group 2”. Spec does not define what to do with rest, so I forget
@@ -1684,6 +1686,17 @@ class KeyMapping :
             #end if
         #end for
         self._code_syms = code_syms
+        mod_sets = list(None for i in range(8))
+        keycodes = list(mods.keycodes)
+        for i in range(len(keycodes) // mods.keycodes_per_modifier) :
+            seg = keycodes \
+              [i * mods.keycodes_per_modifier : (i + 1) * mods.keycodes_per_modifier]
+            while len(seg) != 0 and seg[-1] == 0 :
+                seg = seg[:-1]
+            #end while
+            mod_sets[i] = set(seg)
+        #end for
+        self.mod_sets = mod_sets
         self.user_data = qahirah.UserDataDict()
         self.mode_switch_mod = None
         self.numlock_mod = STATE.MOD2
@@ -1692,30 +1705,36 @@ class KeyMapping :
 
     @classmethod
     def obtain_from(celf, conn : Connection) :
-        "queries the specified X server connection for its current key mapping" \
-        " and returns a KeyMapping object based on that."
+        "queries the specified X server connection for its current key and" \
+        " modifier mappings and returns a KeyMapping object based on that."
         if not isinstance(conn, Connection) :
             raise TypeError("conn must be a Connection")
         #end if
         res = conn.conn.core.GetKeyboardMapping(KEYCODE_MIN, KEYCODE_MAX - KEYCODE_MIN + 1)
-        mapping = res.reply()
+        keys = res.reply()
+        res = conn.conn.core.GetModifierMapping()
+        mods = res.reply()
         return \
-            celf(mapping, KEYCODE_MIN)
+            celf(keys, KEYCODE_MIN, mods)
     #end obtain_from
 
     @classmethod
     async def obtain_from_async(celf, conn : Connection) :
-        "queries the specified X server connection for its current key mapping" \
-        " and returns a KeyMapping object based on that."
+        "queries the specified X server connection for its current key and" \
+        " modifier mappings and returns a KeyMapping object based on that."
         if not isinstance(conn, Connection) :
             raise TypeError("conn must be a Connection")
         #end if
-        mapping = await conn.wait_for_reply \
+        keys = await conn.wait_for_reply \
           (
             conn.conn.core.GetKeyboardMapping(KEYCODE_MIN, KEYCODE_MAX - KEYCODE_MIN + 1)
           )
+        mods = await conn.wait_for_reply \
+          (
+            conn.conn.core.GetModiferMapping()
+          )
         return \
-            celf(mapping, KEYCODE_MIN)
+            celf(keys, KEYCODE_MIN, mods)
     #end obtain_from_async
 
     def map_simple(self, evt : xproto.KeyPressEvent) :
