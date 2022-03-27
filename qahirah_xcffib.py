@@ -1656,10 +1656,12 @@ class KeyMapping :
             "__weakref__",
             "_code_syms",
             "mod_sets",
+            "mod_map", # mapping from modifier key to modifier
             "user_data", # dict, initially empty, may be used by caller for any purpose
-            "mode_switch_mod",
-            "numlock_mod",
+            "mode_switch_mod", # mode-switch modifier STATE.xxx or None, default None
+            "numlock_mod", # num-lock modifier STATE.xxx or None, default STATE.MOD2
             "lock_is_shift_lock",
+              # True if Lock means Shift-Lock, False for Caps-Lock, default False
         ) # to forestall typos
 
     def __init__(self, keys, start_keycode, mods) :
@@ -1696,7 +1698,15 @@ class KeyMapping :
             #end while
             mod_sets[i] = set(seg)
         #end for
+        mod_map = {}
+        for i, modset in enumerate(mod_sets) :
+            for m in modset :
+                assert m not in mod_map
+                mod_map[m] = STATE(i)
+            #end for
+        #end for
         self.mod_sets = mod_sets
+        self.mod_map = mod_map
         self.user_data = qahirah.UserDataDict()
         self.mode_switch_mod = None
         self.numlock_mod = STATE.MOD2
