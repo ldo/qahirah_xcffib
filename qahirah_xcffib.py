@@ -2350,8 +2350,9 @@ class Window :
                     count = 0
                   ).pack()
           )
-        self.conn.conn.request_check(res.sequence)
-        #self.conn.conn.flush() # could try if above gives trouble
+        # Never quite sure which of these is going to work ...
+        #self.conn.conn.request_check(res.sequence)
+        self.conn.conn.flush() # could try if above gives trouble
     #end invalidate
 
     def clear_area(self, bounds : Rect, exposures : bool) :
