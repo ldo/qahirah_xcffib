@@ -1,6 +1,6 @@
 This module wraps the [xcffib Python binding](https://github.com/tych0/xcffib)
 for XCB as an extension to Qahirah ([GitLab](https://gitlab.com/ldo/qahirah),
-[GitHub](https://github.com/ldo/qahirah)), my Python binding for the
+[BitBucket](https://bitbucket.org/ldo17/qahirah)), my Python binding for the
 Cairo graphics library. You will need to have that installed as well.
 
 This module subclasses `qahirah.XCBSurface` with overriding create
@@ -111,7 +111,7 @@ Examples
 
 To see examples of this module in action, see my `qahirah_xcffib_examples`
 project ([GitLab](https://gitlab.com/ldo/qahirah_xcffib_examples),
-[GitHub](https://github.com/ldo/qahirah_xcffib_examples)).
+[BitBucket](https://bitbucket.org/ldo17/qahirah_xcffib_examples)).
 
 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>
-2022 March 31
+2023 August 26
