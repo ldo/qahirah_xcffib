@@ -41,7 +41,7 @@ setuptools.setup \
     description = "asyncio-friendly language bindings for xcffib, for Python 3.5 or later",
     author = "Lawrence D'Oliveiro",
     author_email = "ldo@geek-central.gen.nz",
-    url = "https://github.com/ldo/qahirah_xcffib",
+    url = "https://gitlab.com/ldo/qahirah_xcffib",
     py_modules = ["qahirah_xcffib"],
     cmdclass =
         {
